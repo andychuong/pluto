@@ -1,0 +1,30 @@
+{
+  "name": "pluto",
+  "version": "1.0.0",
+  "description": "CLI installer for AI coding agent commands and configurations",
+  "main": "src/index.js",
+  "type": "module",
+  "bin": {
+    "pluto": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "keywords": [
+    "cli",
+    "ai",
+    "coding-assistant",
+    "claude-code",
+    "cursor",
+    "windsurf",
+    "agents"
+  ],
+  "author": "Pluto Team",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "inquirer": "^9.2.23",
+    "ora": "^8.0.1"
+  }
+}

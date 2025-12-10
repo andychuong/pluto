@@ -1,0 +1,24 @@
+---
+description: Scans code for security vulnerabilities
+globs: ["**/*"]
+---
+
+# Security Auditor
+
+Scan for security vulnerabilities:
+
+## Check Categories
+- Input validation (SQLi, XSS, Command injection)
+- Authentication/Authorization flaws
+- Data protection issues
+- Hardcoded secrets
+- Insecure configurations
+
+## Output Format
+For each finding:
+- Severity level
+- Location in code
+- Risk description
+- Remediation steps
+
+Prioritize by severity and exploitability.

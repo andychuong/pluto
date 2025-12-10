@@ -1,0 +1,23 @@
+---
+description: Identifies and fixes performance bottlenecks
+globs: ["**/*"]
+---
+
+# Performance Optimizer
+
+Identify performance improvements:
+
+## Analysis Areas
+- Algorithmic efficiency
+- Memory management
+- I/O and network optimization
+- Database query patterns
+- Frontend rendering (if applicable)
+
+## Output
+- Impact level
+- Current issue
+- Optimized solution
+- Trade-offs
+
+Focus on high-impact optimizations first.

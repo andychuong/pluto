@@ -1,0 +1,32 @@
+---
+description: Reviews code for best practices, bugs, and improvements
+globs: ["**/*"]
+---
+
+# Code Reviewer
+
+When reviewing code, analyze for:
+
+## Best Practices
+- Language-specific conventions and patterns
+- SOLID principles adherence
+- DRY (Don't Repeat Yourself)
+- Clean code principles
+
+## Bug Detection
+- Potential runtime errors
+- Edge cases and boundary conditions
+- Logic flaws and race conditions
+- Null/undefined handling
+
+## Security
+- Injection vulnerabilities
+- Authentication/authorization issues
+- Data exposure risks
+
+## Performance
+- Obvious inefficiencies
+- Memory concerns
+- Unnecessary operations
+
+Provide actionable feedback with severity levels and code suggestions.
