@@ -11,7 +11,7 @@ NC='\033[0m' # No Color
 
 PLUTO_VERSION="1.0.0"
 INSTALL_DIR="$HOME/.pluto"
-BIN_DIR="/usr/local/bin"
+BIN_DIR="$HOME/.local/bin"
 
 echo -e "${CYAN}"
 echo "╔═══════════════════════════════════════════╗"
@@ -118,27 +118,15 @@ chmod +x "$INSTALL_DIR/src/index.js"
 # Create symlink in bin directory
 echo -e "\n${CYAN}Creating command symlink...${NC}"
 
-# Check if we can write to /usr/local/bin, otherwise use ~/.local/bin
-if [ -w "$BIN_DIR" ]; then
-    ln -sf "$INSTALL_DIR/src/index.js" "$BIN_DIR/pluto"
-    echo -e "${GREEN}✓${NC} Symlink created at ${BIN_DIR}/pluto"
-else
-    # Try with sudo
-    echo -e "${YELLOW}Need sudo access to create symlink in ${BIN_DIR}${NC}"
-    sudo ln -sf "$INSTALL_DIR/src/index.js" "$BIN_DIR/pluto" || {
-        # Fallback to ~/.local/bin
-        BIN_DIR="$HOME/.local/bin"
-        mkdir -p "$BIN_DIR"
-        ln -sf "$INSTALL_DIR/src/index.js" "$BIN_DIR/pluto"
-        echo -e "${GREEN}✓${NC} Symlink created at ${BIN_DIR}/pluto"
+mkdir -p "$BIN_DIR"
+ln -sf "$INSTALL_DIR/src/index.js" "$BIN_DIR/pluto"
+echo -e "${GREEN}✓${NC} Symlink created at ${BIN_DIR}/pluto"
 
-        # Check if ~/.local/bin is in PATH
-        if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
-            echo -e "\n${YELLOW}Note: Add ${BIN_DIR} to your PATH:${NC}"
-            echo -e "  Add this line to your ~/.bashrc or ~/.zshrc:"
-            echo -e "  ${CYAN}export PATH=\"\$HOME/.local/bin:\$PATH\"${NC}"
-        fi
-    }
+# Check if ~/.local/bin is in PATH
+if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
+    echo -e "\n${YELLOW}Note: Add ${BIN_DIR} to your PATH:${NC}"
+    echo -e "  Add this line to your ~/.bashrc or ~/.zshrc:"
+    echo -e "  ${CYAN}export PATH=\"\$HOME/.local/bin:\$PATH\"${NC}"
 fi
 
 # Verify installation
