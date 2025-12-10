@@ -66,28 +66,45 @@ if [ -d "$SCRIPT_DIR/installer" ]; then
     echo -e "${CYAN}Installing from local source...${NC}"
     cp -r "$SCRIPT_DIR/installer/"* "$INSTALL_DIR/"
 else
-    # Download from GitHub releases (placeholder URL - update when repo is public)
-    echo -e "${CYAN}Downloading Pluto v${PLUTO_VERSION}...${NC}"
+    # Download from GitHub
+    echo -e "${CYAN}Downloading Pluto from GitHub...${NC}"
 
-    DOWNLOAD_URL="https://github.com/your-org/pluto/releases/download/v${PLUTO_VERSION}/pluto-${PLUTO_VERSION}.tar.gz"
+    REPO_URL="https://github.com/andychuong/pluto"
 
-    if command -v curl &> /dev/null; then
-        curl -fsSL "$DOWNLOAD_URL" -o "/tmp/pluto.tar.gz" || {
+    # Clone the repo to a temp directory and copy installer contents
+    TEMP_DIR=$(mktemp -d)
+
+    if command -v git &> /dev/null; then
+        git clone --depth 1 --quiet "$REPO_URL" "$TEMP_DIR" || {
             echo -e "${RED}Failed to download Pluto. Please check your internet connection.${NC}"
+            rm -rf "$TEMP_DIR"
             exit 1
         }
-    elif command -v wget &> /dev/null; then
-        wget -q "$DOWNLOAD_URL" -O "/tmp/pluto.tar.gz" || {
-            echo -e "${RED}Failed to download Pluto. Please check your internet connection.${NC}"
-            exit 1
-        }
+        cp -r "$TEMP_DIR/installer/"* "$INSTALL_DIR/"
+        rm -rf "$TEMP_DIR"
     else
-        echo -e "${RED}Error: curl or wget is required.${NC}"
-        exit 1
-    fi
+        # Fallback to downloading tarball
+        TARBALL_URL="https://github.com/andychuong/pluto/archive/refs/heads/main.tar.gz"
 
-    tar -xzf "/tmp/pluto.tar.gz" -C "$INSTALL_DIR"
-    rm "/tmp/pluto.tar.gz"
+        if command -v curl &> /dev/null; then
+            curl -fsSL "$TARBALL_URL" -o "/tmp/pluto.tar.gz" || {
+                echo -e "${RED}Failed to download Pluto. Please check your internet connection.${NC}"
+                exit 1
+            }
+        elif command -v wget &> /dev/null; then
+            wget -q "$TARBALL_URL" -O "/tmp/pluto.tar.gz" || {
+                echo -e "${RED}Failed to download Pluto. Please check your internet connection.${NC}"
+                exit 1
+            }
+        else
+            echo -e "${RED}Error: git, curl, or wget is required.${NC}"
+            exit 1
+        fi
+
+        tar -xzf "/tmp/pluto.tar.gz" -C "/tmp"
+        cp -r "/tmp/pluto-main/installer/"* "$INSTALL_DIR/"
+        rm -rf "/tmp/pluto.tar.gz" "/tmp/pluto-main"
+    fi
 fi
 
 # Install dependencies
