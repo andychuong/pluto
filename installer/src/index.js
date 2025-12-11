@@ -23,17 +23,56 @@ const AI_TOOLS = [
   { name: 'Codex', value: 'codex', dir: '', settingsFile: null },
 ];
 
-// Available agents/commands
-const AVAILABLE_AGENTS = [
-  { name: 'Pluto Snap', value: 'pluto-snap', description: 'Commit with prompt & explanation' },
-  { name: 'Pluto Start', value: 'pluto-start', description: 'Enable auto-commit tracking for session' },
-  { name: 'Code Reviewer', value: 'code-reviewer', description: 'Reviews code for best practices and bugs' },
-  { name: 'Test Generator', value: 'test-generator', description: 'Generates test suites for your code' },
-  { name: 'Documentation Writer', value: 'doc-writer', description: 'Creates documentation for your codebase' },
-  { name: 'Refactoring Assistant', value: 'refactor', description: 'Helps refactor code for maintainability' },
-  { name: 'Security Auditor', value: 'security', description: 'Scans code for security vulnerabilities' },
-  { name: 'Performance Optimizer', value: 'performance', description: 'Identifies performance bottlenecks' },
-];
+// Dynamically discover available agents from the commands directory
+async function discoverAvailableAgents() {
+  const commandsDir = path.join(__dirname, '..', 'commands');
+  const claudeCodeDir = path.join(commandsDir, 'claude-code');
+  
+  try {
+    const allFiles = await findMarkdownFilesRecursive(claudeCodeDir, claudeCodeDir, ['.md']);
+    const agents = [];
+    const seen = new Set();
+    
+    for (const file of allFiles) {
+      const { basename, subdirectory } = file;
+      
+      // Skip duplicates (we'll show them with unique names later)
+      if (!seen.has(basename)) {
+        seen.add(basename);
+        
+        // Create friendly names
+        const friendlyName = basename
+          .split('-')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+        
+        agents.push({
+          name: friendlyName,
+          value: basename,
+          description: subdirectory ? `From ${subdirectory}/` : 'Command',
+          subdirectory
+        });
+      }
+    }
+    
+    return agents.sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    // Fallback to hardcoded list if discovery fails
+    return [
+      { name: 'Pluto Snap', value: 'pluto-snap', description: 'Commit with prompt & explanation' },
+      { name: 'Pluto Start', value: 'pluto-start', description: 'Enable auto-commit tracking for session' },
+      { name: 'Code Reviewer', value: 'code-reviewer', description: 'Reviews code for best practices and bugs' },
+    ];
+  }
+}
+
+// Available agents/commands (will be populated dynamically)
+let AVAILABLE_AGENTS = [];
+
+// Initialize agents list
+async function initializeAgents() {
+  AVAILABLE_AGENTS = await discoverAvailableAgents();
+}
 
 // Only show banner for interactive commands
 const isQuietCommand = process.argv.includes('--quiet') || process.argv.includes('-q');
@@ -58,6 +97,9 @@ program
   .command('init')
   .description('Initialize Pluto in your project')
   .action(async () => {
+    // Initialize agents list
+    await initializeAgents();
+    
     console.log(chalk.yellow('\n📋 Let\'s set up Pluto for your project!\n'));
 
     // Step 1: Select AI tools
@@ -183,6 +225,9 @@ program
   .command('list')
   .description('List available commands')
   .action(async () => {
+    // Initialize agents list
+    await initializeAgents();
+    
     console.log(chalk.bold('\n🤖 Available Commands:\n'));
 
     for (const agent of AVAILABLE_AGENTS) {
@@ -198,6 +243,89 @@ program
   });
 
 program.parse();
+
+// Helper function to recursively find all markdown files in a directory
+async function findMarkdownFilesRecursive(dir, baseDir = dir, extensions = ['.md']) {
+  const files = [];
+  
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      
+      if (entry.isDirectory()) {
+        // Recursively search subdirectories
+        const subFiles = await findMarkdownFilesRecursive(fullPath, baseDir, extensions);
+        files.push(...subFiles);
+      } else if (entry.isFile()) {
+        // Check if file has one of the allowed extensions
+        const ext = path.extname(entry.name);
+        if (extensions.includes(ext)) {
+          // Calculate relative path from base directory
+          const relativePath = path.relative(baseDir, fullPath);
+          const subdir = path.dirname(relativePath);
+          
+          files.push({
+            fullPath,
+            filename: entry.name,
+            basename: path.basename(entry.name, ext),
+            extension: ext,
+            subdirectory: subdir === '.' ? '' : subdir
+          });
+        }
+      }
+    }
+  } catch (error) {
+    // Directory doesn't exist or can't be read
+  }
+  
+  return files;
+}
+
+// Generate a unique destination filename, handling conflicts
+function generateDestinationFilename(files, extension) {
+  const nameMap = new Map();
+  
+  // First pass: collect all basenames and their subdirectories
+  for (const file of files) {
+    const { basename, subdirectory } = file;
+    if (!nameMap.has(basename)) {
+      nameMap.set(basename, []);
+    }
+    nameMap.get(basename).push({ subdirectory, file });
+  }
+  
+  // Second pass: generate unique names
+  const result = [];
+  for (const [basename, entries] of nameMap) {
+    if (entries.length === 1) {
+      // No conflict, use original name
+      const entry = entries[0];
+      result.push({
+        sourcePath: entry.file.fullPath,
+        destFilename: `${basename}${extension}`,
+        originalName: basename,
+        subdirectory: entry.subdirectory
+      });
+    } else {
+      // Conflict: add subdirectory suffix
+      for (const entry of entries) {
+        const subdir = entry.subdirectory || 'root';
+        const subdirSuffix = subdir.replace(/\//g, '-').replace(/\\/g, '-');
+        const destFilename = `${basename}-${subdirSuffix}${extension}`;
+        result.push({
+          sourcePath: entry.file.fullPath,
+          destFilename,
+          originalName: basename,
+          subdirectory: entry.subdirectory
+        });
+      }
+    }
+  }
+  
+  return result;
+}
 
 // Hook installation function
 async function installHooksForTool(cwd, tool, hooksDir, commitMode) {
@@ -290,13 +418,23 @@ async function installForTool(cwd, tool, agents, commandsDir) {
       const destDir = path.join(cwd, '.claude', 'commands');
       await fs.mkdir(destDir, { recursive: true });
 
-      for (const agent of agents) {
-        const src = path.join(toolCommandsDir, `${agent}.md`);
-        const dest = path.join(destDir, `${agent}.md`);
+      // Find all markdown files recursively
+      const allFiles = await findMarkdownFilesRecursive(toolCommandsDir, toolCommandsDir, ['.md']);
+      
+      // Generate destination filenames with conflict resolution
+      const fileMap = generateDestinationFilename(allFiles, '.md');
+      
+      // Filter to only install selected agents if agents array is provided
+      const filesToInstall = agents && agents.length > 0 
+        ? fileMap.filter(f => agents.includes(f.originalName) || agents.includes(f.destFilename.replace('.md', '')))
+        : fileMap;
+
+      for (const { sourcePath, destFilename } of filesToInstall) {
+        const dest = path.join(destDir, destFilename);
         try {
-          await fs.copyFile(src, dest);
-        } catch {
-          // Skip if file doesn't exist
+          await fs.copyFile(sourcePath, dest);
+        } catch (error) {
+          // Skip if file can't be copied
         }
       }
       break;
@@ -306,19 +444,27 @@ async function installForTool(cwd, tool, agents, commandsDir) {
       const destDir = path.join(cwd, '.cursor', 'rules');
       await fs.mkdir(destDir, { recursive: true });
 
-      for (const agent of agents) {
-        const src = path.join(toolCommandsDir, `${agent}.mdc`);
-        const dest = path.join(destDir, `${agent}.mdc`);
+      // Find all markdown files recursively (try .mdc first, fallback to .md)
+      const mdcFiles = await findMarkdownFilesRecursive(toolCommandsDir, toolCommandsDir, ['.mdc']);
+      const mdFiles = await findMarkdownFilesRecursive(toolCommandsDir, toolCommandsDir, ['.md']);
+      
+      // Prefer .mdc files, but include .md files that don't have .mdc equivalents
+      const mdcBasenames = new Set(mdcFiles.map(f => f.basename));
+      const allFiles = [...mdcFiles, ...mdFiles.filter(f => !mdcBasenames.has(f.basename))];
+      
+      // Use .mdc extension for output
+      const fileMap = generateDestinationFilename(allFiles, '.mdc');
+      
+      const filesToInstall = agents && agents.length > 0 
+        ? fileMap.filter(f => agents.includes(f.originalName) || agents.includes(f.destFilename.replace('.mdc', '')))
+        : fileMap;
+
+      for (const { sourcePath, destFilename } of filesToInstall) {
+        const dest = path.join(destDir, destFilename);
         try {
-          await fs.copyFile(src, dest);
-        } catch {
-          // Try .md fallback
-          try {
-            const srcMd = path.join(toolCommandsDir, `${agent}.md`);
-            await fs.copyFile(srcMd, dest.replace('.mdc', '.md'));
-          } catch {
-            // Skip
-          }
+          await fs.copyFile(sourcePath, dest);
+        } catch (error) {
+          // Skip if file can't be copied
         }
       }
       break;
@@ -329,13 +475,19 @@ async function installForTool(cwd, tool, agents, commandsDir) {
       const destDir = path.join(cwd, tool.dir);
       await fs.mkdir(destDir, { recursive: true });
 
-      for (const agent of agents) {
-        const src = path.join(toolCommandsDir, `${agent}.md`);
-        const dest = path.join(destDir, `${agent}.md`);
+      const allFiles = await findMarkdownFilesRecursive(toolCommandsDir, toolCommandsDir, ['.md']);
+      const fileMap = generateDestinationFilename(allFiles, '.md');
+      
+      const filesToInstall = agents && agents.length > 0 
+        ? fileMap.filter(f => agents.includes(f.originalName) || agents.includes(f.destFilename.replace('.md', '')))
+        : fileMap;
+
+      for (const { sourcePath, destFilename } of filesToInstall) {
+        const dest = path.join(destDir, destFilename);
         try {
-          await fs.copyFile(src, dest);
-        } catch {
-          // Skip
+          await fs.copyFile(sourcePath, dest);
+        } catch (error) {
+          // Skip if file can't be copied
         }
       }
       break;
@@ -345,14 +497,20 @@ async function installForTool(cwd, tool, agents, commandsDir) {
       const destDir = path.join(cwd, '.github');
       await fs.mkdir(destDir, { recursive: true });
 
+      const allFiles = await findMarkdownFilesRecursive(toolCommandsDir, toolCommandsDir, ['.md']);
+      const fileMap = generateDestinationFilename(allFiles, '.md');
+      
+      const filesToInstall = agents && agents.length > 0 
+        ? fileMap.filter(f => agents.includes(f.originalName) || agents.includes(f.destFilename.replace('.md', '')))
+        : fileMap;
+
       let content = '# GitHub Copilot Instructions\n\nGenerated by Pluto.\n\n';
-      for (const agent of agents) {
-        const src = path.join(toolCommandsDir, `${agent}.md`);
+      for (const { sourcePath } of filesToInstall) {
         try {
-          const agentContent = await fs.readFile(src, 'utf-8');
+          const agentContent = await fs.readFile(sourcePath, 'utf-8');
           content += agentContent + '\n\n';
         } catch {
-          // Skip
+          // Skip if file can't be read
         }
       }
       await fs.writeFile(path.join(destDir, 'copilot-instructions.md'), content);
@@ -360,14 +518,20 @@ async function installForTool(cwd, tool, agents, commandsDir) {
     }
 
     case 'codex': {
+      const allFiles = await findMarkdownFilesRecursive(toolCommandsDir, toolCommandsDir, ['.md']);
+      const fileMap = generateDestinationFilename(allFiles, '.md');
+      
+      const filesToInstall = agents && agents.length > 0 
+        ? fileMap.filter(f => agents.includes(f.originalName) || agents.includes(f.destFilename.replace('.md', '')))
+        : fileMap;
+
       let content = '# AI Agents\n\nGenerated by Pluto.\n\n';
-      for (const agent of agents) {
-        const src = path.join(toolCommandsDir, `${agent}.md`);
+      for (const { sourcePath } of filesToInstall) {
         try {
-          const agentContent = await fs.readFile(src, 'utf-8');
+          const agentContent = await fs.readFile(sourcePath, 'utf-8');
           content += agentContent + '\n\n';
         } catch {
-          // Skip
+          // Skip if file can't be read
         }
       }
       await fs.writeFile(path.join(cwd, 'AGENTS.md'), content);
