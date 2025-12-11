@@ -9,10 +9,33 @@ Create a micro-commit for the current changes. Run this after every file modific
 
 ## Behavior
 
-1. Stage all current changes (or specific files if mentioned)
-2. Generate a micro-commit with full metadata
-3. Use the conventional commit format with session tracking
-4. Append commit entry to `.ai-git/session-log.md` with commit hash
+1. Verify changes before staging
+2. Stage the relevant files (prefer explicit over `git add -A`)
+3. Generate a micro-commit with full metadata
+4. Use the conventional commit format with session tracking
+
+## Before Committing
+
+Always verify what you're about to commit:
+
+```bash
+# See what's changed
+git status
+
+# Review the actual changes
+git diff                 # unstaged changes
+git diff --staged        # if already staged
+```
+
+Ensure only intended files are included. Prefer explicit staging:
+```bash
+git add src/auth/middleware.ts src/types/auth.ts
+```
+
+Over blanket staging:
+```bash
+git add -A  # Use sparingly — may include unintended files
+```
 
 ## Commit Message Format
 ```
@@ -46,54 +69,35 @@ prompt: add authentication to api
 reason: added validation function
 touched: src/middleware/auth.ts
 ```
-3. Get the commit hash: `git rev-parse HEAD`
-4. Append to session log (see Session Log Entry Format below)
 
-## Session Log Entry Format
+## What Counts as One Micro-Commit
 
-After creating the commit, append a Commit Entry to `.ai-git/session-log.md`:
+One **logical change** = one micro-commit. This may include multiple files if:
+- They're part of the same atomic operation (type + implementation)
+- They're meaningless without each other (function + import)
+- They were changed together for the same reason
+
+But always create separate micro-commits for:
+- A feature + an unrelated fix you noticed
+- Implementation + a later bug fix to it
+- Changes serving different user requests
+
+## Cross-Session Awareness
+
+Multiple AI sessions may work concurrently. Before committing, you can check
+if another session recently modified the same file:
 
 ```bash
-# Get the commit hash
-COMMIT_HASH=$(git rev-parse HEAD)
-
-# Get the files changed
-FILES_CHANGED=$(git diff-tree --no-commit-id --name-only -r HEAD | tr '\n' ', ' | sed 's/,$//')
-
-# Append to log
-cat >> .ai-git/session-log.md << EOF
-
-## Commit Entry
-- **Timestamp**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-- **File Changed**: $FILES_CHANGED
-- **Type**: <type>(<scope>)
-- **Description**: <commit message title>
-- **Reason**: <reason provided by user or inferred>
-- **Commit Hash**: ${COMMIT_HASH:0:7}
-
----
-EOF
+git log -1 --format="%b" -- <file> | grep "^session:"
 ```
 
-### Example Session Log Entry
-
-```markdown
-## Commit Entry
-- **Timestamp**: 2024-01-15 10:32:45 UTC
-- **File Changed**: src/middleware/auth.ts
-- **Type**: feat(auth)
-- **Description**: add validation function
-- **Reason**: added validation function for JWT tokens
-- **Commit Hash**: a1b2c3d
-
----
-```
+This is informational — proceed with your commit. The consolidation agent
+will untangle cross-session changes later using diffs and session IDs.
 
 ## Important
 
 - Never skip micro-commits
-- One logical change per commit
+- One logical change per commit (may span multiple files)
 - Always include session ID for later consolidation
 - Keep the short description under 50 chars
-- ALWAYS append commit entry to `.ai-git/session-log.md` after committing
-- If no active session exists, auto-start one with `/session start`
+- Verify changes with `git status` / `git diff` before staging
