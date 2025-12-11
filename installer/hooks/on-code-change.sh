@@ -4,5 +4,5 @@
 # Outputs JSON block decision to run /pluto-snap command
 
 cat <<'EOF'
-{"decision": "block", "reason": "/pluto-snap"}
+{"decision": "block", "reason": "File was modified. Run the /pluto-snap command now to commit this change with the original prompt."}
 EOF
