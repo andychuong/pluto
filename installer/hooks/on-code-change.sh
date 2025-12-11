@@ -3,8 +3,15 @@
 # Triggered by PostToolUse when Write|Edit tools are used
 # Commits the file change with prompt from transcript
 
+# Log file for debugging
+LOG_FILE="${HOME}/.pluto/hook.log"
+mkdir -p "$(dirname "$LOG_FILE")"
+
+echo "=== Hook triggered at $(date) ===" >> "$LOG_FILE"
+
 # Read hook input from stdin
 INPUT=$(cat)
+echo "INPUT: $INPUT" >> "$LOG_FILE"
 
 # Extract file path and transcript path
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
@@ -60,10 +67,12 @@ if git diff --cached --quiet "$FILE_PATH" 2>/dev/null; then
 fi
 
 # Create commit
-git commit -m "pluto: update $REL_PATH
+COMMIT_OUTPUT=$(git commit -m "pluto: update $REL_PATH
 
 Prompt: $PROMPT
 
-🤖 Generated with Pluto" --quiet 2>&1 >/dev/null
+🤖 Generated with Pluto" 2>&1)
+echo "COMMIT OUTPUT: $COMMIT_OUTPUT" >> "$LOG_FILE"
 
+echo "=== Hook completed ===" >> "$LOG_FILE"
 exit 0
