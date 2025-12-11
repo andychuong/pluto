@@ -8,6 +8,22 @@ Rewrite micro-commits into clean, consolidated commits with automatic failsafe r
 /consolidate [--plan <file>] [--no-qa] [--no-failsafe]
 ```
 
+## Scope: Global Consolidation
+
+Consolidation is **global across all sessions**. When triggered:
+
+1. Gather ALL micro-commits since last push (from all concurrent sessions)
+2. The consolidation-agent groups them using session IDs as hints
+3. Result is a unified clean history reflecting all sessions' work
+
+```bash
+# Find ALL micro-commits (from any session)
+git log --grep="^session:" --format="%H" origin/main..HEAD
+```
+
+This means when you say "push" in one session, all concurrent sessions'
+micro-commits get consolidated together.
+
 ## Behavior
 
 1. If no plan provided, first run `consolidation-agent` to generate one
@@ -16,6 +32,7 @@ Rewrite micro-commits into clean, consolidated commits with automatic failsafe r
 4. Run `qa-agent` on each consolidated commit sequentially
 5. If QA fails, trigger failsafe mechanism (unless `--no-failsafe`)
 6. Report results
+7. Clear all session state (all sessions' micro-commits are now consolidated)
 
 ## Execution Steps
 
@@ -160,20 +177,29 @@ Progress saved to `.ai-git/state.json`:
 
 ```json
 {
-  "session": "ses_7x9k2m",
+  "sessions_consolidated": ["ses_7x9k2m", "ses_abc123", "ses_def456"],
   "original_head": "abc123",
   "status": "consolidating",
   "verified_commits": [
     {
       "title": "feat(auth): add JWT middleware",
       "sha": "def456",
+      "from_sessions": ["ses_7x9k2m"],
       "consumed": ["c1", "c2", "c5", "c7", "c12", "c15"],
       "qa_status": "pass"
     },
     {
       "title": "test(auth): add auth tests",
       "sha": "ghi789",
+      "from_sessions": ["ses_7x9k2m"],
       "consumed": ["c8", "c9", "c14", "c18"],
+      "qa_status": "pass"
+    },
+    {
+      "title": "fix(ui): button alignment",
+      "sha": "jkl012",
+      "from_sessions": ["ses_abc123"],
+      "consumed": ["b1", "b2", "b3"],
       "qa_status": "pass"
     }
   ],
@@ -270,9 +296,27 @@ Progress saved to `.ai-git/state.json`:
 
 ---
 
+## Post-Consolidation Cleanup
+
+After consolidation (success or partial):
+
+```bash
+# Clear all session tracking (all sessions' commits are now consolidated)
+rm -f .ai-git/sessions/*.json
+rm -f .ai-git/current-session
+
+# Update state file
+# On success: remove state.json
+# On partial: keep state.json with unconsolidated info
+```
+
+Any session that continues working after consolidation will auto-start
+a fresh session. Their new micro-commits will be consolidated in the
+next push cycle.
+
 ## Integration
 
 After consolidation (success or partial):
-- Update `.ai-git/sessions.json` with results
-- Clear or update `.ai-git/state.json`
+- Clear all session state (micro-commits are now in clean history)
+- Update or remove `.ai-git/state.json`
 - Report to user with clear next steps
