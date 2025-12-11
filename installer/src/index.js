@@ -208,12 +208,17 @@ async function installHooksForTool(cwd, tool, hooksDir) {
     settings.hooks.PostToolUse = [];
   }
   const postToolHookExists = settings.hooks.PostToolUse.some(
-    h => h.command && h.command.includes('on-code-change.sh')
+    h => h.matcher === 'Write|Edit' && h.hooks?.some(hook => hook.command?.includes('on-code-change.sh'))
   );
   if (!postToolHookExists) {
     settings.hooks.PostToolUse.push({
       matcher: 'Write|Edit',
-      command: `.pluto/hooks/on-code-change.sh`
+      hooks: [
+        {
+          type: 'command',
+          command: '"$CLAUDE_PROJECT_DIR"/.pluto/hooks/on-code-change.sh'
+        }
+      ]
     });
   }
 
