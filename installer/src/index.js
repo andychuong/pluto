@@ -249,7 +249,7 @@ async function installHooksForTool(cwd, tool, hooksDir, commitMode) {
         hooks: [
           {
             type: 'command',
-            command: '$CLAUDE_PROJECT_DIR/.pluto/hooks/on-stop.sh'
+            command: '"$CLAUDE_PROJECT_DIR/.pluto/hooks/on-stop.sh"'
           }
         ]
       });
@@ -268,7 +268,7 @@ async function installHooksForTool(cwd, tool, hooksDir, commitMode) {
         hooks: [
           {
             type: 'command',
-            command: '$CLAUDE_PROJECT_DIR/.pluto/hooks/on-compact.sh'
+            command: '"$CLAUDE_PROJECT_DIR/.pluto/hooks/on-compact.sh"'
           }
         ]
       });
