@@ -16,9 +16,21 @@ Include the session ID in all micro-commits. This links your work together for c
 
 ### After Every File Change
 
-Immediately after modifying or creating any file, run `/micro` to create a micro-commit. 
+Immediately after modifying or creating any file, run `/micro` to create a micro-commit.
 
-**Do not batch changes.** One file modification = one micro-commit. This creates a rich audit trail that can be intelligently consolidated later.
+### What Counts as One Micro-Commit
+
+One **logical change** = one micro-commit. This may span multiple files if they're:
+- Part of the same atomic operation (e.g., type definition + implementation)
+- Changed together in a single edit action
+- Meaningless without each other (e.g., function + its import)
+
+But always separate these into distinct micro-commits:
+- A feature change + an unrelated fix you noticed
+- Implementation + a later bug fix to that implementation
+- Changes for different user requests
+
+This creates a rich audit trail that can be intelligently consolidated later.
 
 ### Micro-Commit Format
 
@@ -133,6 +145,51 @@ When user indicates completion or you suggest consolidation:
 3. Run `/consolidate` to rewrite history
 4. Run `/qa` to validate
 5. Offer to push or note ready state
+
+---
+
+## Multi-Session Consolidation
+
+Multiple AI sessions may work concurrently in the same repository. Each session
+tags its commits with a unique session ID for traceability.
+
+### Key Principle: Consolidation is Global
+
+When you (or any session) trigger push intent, **ALL micro-commits consolidate** —
+not just yours. Session IDs help the consolidation agent group related work, but
+the result is a unified clean history reflecting everyone's contributions.
+
+### Why Global Consolidation?
+
+When a user says "push" in any window, they mean: "save the current state of my
+codebase." That state is the product of all concurrent sessions' work — auth
+feature from Session A, CSS fix from Session B, logging from Session C.
+
+### Push Intent = Consolidate Everything
+
+When you detect push intent, consolidate ALL pending micro-commits:
+
+```bash
+# Find ALL micro-commits since last push/consolidation
+git log --grep="^session:" --format="%H" origin/main..HEAD
+```
+
+### Cross-Session Awareness
+
+Before modifying a file, you may check if another session recently touched it:
+
+```bash
+git log -1 --format="%b" -- <file> | grep "^session:"
+```
+
+This is informational — proceed with your change, but awareness helps during
+consolidation when the agent analyzes how changes from different sessions relate.
+
+### After Global Consolidation
+
+All sessions' micro-commits are replaced with clean history. Any session that
+continues working starts fresh — their new micro-commits will be consolidated
+in the next push cycle.
 
 ---
 
