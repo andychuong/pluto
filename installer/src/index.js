@@ -172,17 +172,21 @@ async function installHooksForTool(cwd, tool, hooksDir) {
   if (!tool.settingsFile) return; // Tool doesn't support hooks
 
   const settingsPath = path.join(cwd, tool.settingsFile);
-  const hookScriptPath = path.join(cwd, '.pluto', 'hooks', 'on-code-change.sh');
+  const hooksDestDir = path.join(cwd, '.pluto', 'hooks');
 
-  // Copy hook script to .pluto/hooks
-  await fs.mkdir(path.join(cwd, '.pluto', 'hooks'), { recursive: true });
-  const srcHook = path.join(hooksDir, 'on-code-change.sh');
-  try {
-    await fs.copyFile(srcHook, hookScriptPath);
-    await fs.chmod(hookScriptPath, 0o755);
-  } catch {
-    // Skip if hook doesn't exist
-    return;
+  // Copy hook scripts to .pluto/hooks
+  await fs.mkdir(hooksDestDir, { recursive: true });
+
+  const hookFiles = ['on-code-change.sh'];
+  for (const hookFile of hookFiles) {
+    const src = path.join(hooksDir, hookFile);
+    const dest = path.join(hooksDestDir, hookFile);
+    try {
+      await fs.copyFile(src, dest);
+      await fs.chmod(dest, 0o755);
+    } catch {
+      // Skip if hook doesn't exist
+    }
   }
 
   // Read existing settings or create new
@@ -198,19 +202,23 @@ async function installHooksForTool(cwd, tool, hooksDir) {
   if (!settings.hooks) {
     settings.hooks = {};
   }
+
+  // Add PostToolUse hook for Write|Edit
   if (!settings.hooks.PostToolUse) {
     settings.hooks.PostToolUse = [];
   }
-
-  // Check if hook already exists
-  const hookExists = settings.hooks.PostToolUse.some(
-    h => h.matcher === 'Write|Edit' && h.command.includes('on-code-change.sh')
+  const postToolHookExists = settings.hooks.PostToolUse.some(
+    h => h.matcher === 'Write|Edit' && h.hooks?.some(hook => hook.command?.includes('on-code-change.sh'))
   );
-
-  if (!hookExists) {
+  if (!postToolHookExists) {
     settings.hooks.PostToolUse.push({
       matcher: 'Write|Edit',
-      command: `.pluto/hooks/on-code-change.sh`
+      hooks: [
+        {
+          type: 'command',
+          command: '"$CLAUDE_PROJECT_DIR"/.pluto/hooks/on-code-change.sh'
+        }
+      ]
     });
   }
 

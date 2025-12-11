@@ -1,15 +1,10 @@
-# Pluto Snap - Auto-commit with Prompt
+# Pluto Snap - Auto-commit with Prompt & Explanation
 
-Commit the current changes with the prompt that generated them.
+Commit the current changes with the original prompt and an explanation of why you made the changes.
 
 ## Instructions
 
-1. **Check for tracked prompt** (from automatic hook):
-   ```bash
-   cat .pluto/.last_prompt 2>/dev/null
-   ```
-   If this file exists, use its content as the original prompt.
-   If it doesn't exist, get the original prompt from your conversation context.
+1. **Get the original user prompt** from your conversation context (the task the user asked you to do)
 
 2. **Get the changed files** by running:
    ```bash
@@ -21,21 +16,28 @@ Commit the current changes with the prompt that generated them.
    git add -A
    ```
 
-4. **Create a commit** with this format:
+4. **Write an explanation** of WHY you made these changes:
+   - What problem were you solving?
+   - Why did you choose this approach?
+   - What does each changed file do?
+
+5. **Create a commit** with this format:
    ```
    <type>: <short summary of what was done>
 
    Prompt: <the original user prompt>
 
+   Why: <your explanation of why you made these changes>
+
    Files changed:
-   - <file1> (created/modified/deleted)
-   - <file2> (created/modified/deleted)
+   - <file1> (created/modified/deleted) - <brief description>
+   - <file2> (created/modified/deleted) - <brief description>
    ...
 
    🤖 Generated with Pluto
    ```
 
-5. **Determine the commit type** from the prompt/changes:
+6. **Determine the commit type** from the prompt/changes:
    - `feat:` - new feature or functionality
    - `fix:` - bug fix
    - `refactor:` - code refactoring
@@ -44,7 +46,7 @@ Commit the current changes with the prompt that generated them.
    - `style:` - formatting, styling
    - `chore:` - maintenance, dependencies
 
-6. **Keep the title under 72 characters**
+7. **Keep the title under 72 characters**
 
 ## Example
 
@@ -64,22 +66,19 @@ git commit -m "feat: Add login form with email and password validation
 
 Prompt: Add a login form with email and password validation
 
+Why: Created a new LoginForm component with controlled inputs for email and password. Added validation utilities to check email format and password strength (min 8 chars, requires number). Updated the index page to render the new form. Used React state for form management to keep it simple and avoid external dependencies.
+
 Files changed:
-- src/components/LoginForm.tsx (created)
-- src/utils/validation.ts (modified)
-- src/pages/index.tsx (modified)
+- src/components/LoginForm.tsx (created) - Form component with email/password inputs
+- src/utils/validation.ts (modified) - Added validateEmail and validatePassword functions
+- src/pages/index.tsx (modified) - Added LoginForm to the page
 
 🤖 Generated with Pluto"
 ```
 
 ## After Committing
 
-1. Report the commit hash to confirm success:
-   ```bash
-   git rev-parse --short HEAD
-   ```
-
-2. Clean up tracking files:
-   ```bash
-   rm -f .pluto/.last_prompt .pluto/.changed_files .pluto/.files_to_commit
-   ```
+Report the commit hash to confirm success:
+```bash
+git rev-parse --short HEAD
+```
