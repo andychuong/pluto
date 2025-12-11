@@ -15,14 +15,19 @@ if [ -z "$FILE_PATH" ]; then
     exit 0
 fi
 
+# Check if file exists
+if [ ! -f "$FILE_PATH" ]; then
+    exit 0
+fi
+
 # Check if we're in a git repo
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 if [ -z "$GIT_ROOT" ]; then
     exit 0
 fi
 
-# Get relative path
-REL_PATH=$(realpath --relative-to="$GIT_ROOT" "$FILE_PATH" 2>/dev/null || basename "$FILE_PATH")
+# Get relative path (macOS compatible)
+REL_PATH=$(python3 -c "import os; print(os.path.relpath('$FILE_PATH', '$GIT_ROOT'))" 2>/dev/null || basename "$FILE_PATH")
 
 # Extract the original user prompt from transcript
 PROMPT="(no prompt captured)"
@@ -45,22 +50,20 @@ if [ ${#PROMPT} -gt 200 ]; then
     PROMPT="${PROMPT:0:197}..."
 fi
 
-# Check if file has changes
-if git diff --quiet "$FILE_PATH" 2>/dev/null && \
-   git diff --cached --quiet "$FILE_PATH" 2>/dev/null && \
-   git ls-files --error-unmatch "$FILE_PATH" 2>/dev/null; then
-    # File exists in git and has no changes
-    exit 0
-fi
-
 # Stage the file
 git add "$FILE_PATH" 2>/dev/null
+
+# Check if there's anything staged for this file
+if git diff --cached --quiet "$FILE_PATH" 2>/dev/null; then
+    # Nothing staged, exit
+    exit 0
+fi
 
 # Create commit
 git commit -m "pluto: update $REL_PATH
 
 Prompt: $PROMPT
 
-🤖 Generated with Pluto" --quiet 2>/dev/null
+🤖 Generated with Pluto" --quiet 2>&1 >/dev/null
 
 exit 0
