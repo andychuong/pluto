@@ -240,6 +240,133 @@ program
     console.log('');
   });
 
+// Update command
+program
+  .command('update')
+  .description('Update agents from remote or local source')
+  .option('-s, --source <path>', 'Local path to pluto repository')
+  .option('-b, --branch <branch>', 'Git branch to pull from (default: main)', 'main')
+  .option('-r, --repo <url>', 'Git repository URL', 'https://github.com/andychuong/pluto')
+  .action(async (options) => {
+    const cwd = process.cwd();
+    const configPath = path.join(cwd, '.pluto', 'config.json');
+
+    // Check if pluto is initialized
+    try {
+      await fs.access(configPath);
+    } catch {
+      console.error(chalk.red('\n❌ Pluto not initialized in this directory.'));
+      console.log(chalk.yellow('Run "pluto init" first.\n'));
+      return;
+    }
+
+    // Read config to get currently installed tools and agents
+    let config;
+    try {
+      const configContent = await fs.readFile(configPath, 'utf-8');
+      config = JSON.parse(configContent);
+    } catch (error) {
+      console.error(chalk.red('\n❌ Failed to read configuration.'));
+      console.error(chalk.red(error.message + '\n'));
+      return;
+    }
+
+    const spinner = ora('Updating agents...').start();
+
+    try {
+      let sourceDir;
+
+      if (options.source) {
+        // Use local source
+        spinner.text = 'Using local source...';
+        sourceDir = path.resolve(options.source);
+        
+        // Verify the local source exists and has the installer directory
+        try {
+          await fs.access(path.join(sourceDir, 'installer', 'commands'));
+        } catch {
+          spinner.fail(chalk.red('Invalid source directory'));
+          console.error(chalk.red('The specified directory does not contain pluto installer files.\n'));
+          return;
+        }
+      } else {
+        // Pull from remote
+        spinner.text = `Pulling from ${options.repo} (${options.branch})...`;
+        
+        const tempDir = path.join(cwd, '.pluto', 'temp-update');
+        
+        // Remove temp dir if it exists
+        try {
+          await fs.rm(tempDir, { recursive: true, force: true });
+        } catch {}
+        
+        await fs.mkdir(tempDir, { recursive: true });
+
+        // Clone the repository
+        const { execSync } = await import('child_process');
+        try {
+          execSync(
+            `git clone --depth 1 --branch ${options.branch} ${options.repo} ${tempDir}`,
+            { stdio: 'pipe' }
+          );
+        } catch (error) {
+          spinner.fail(chalk.red('Failed to pull from remote'));
+          console.error(chalk.red(`Git error: ${error.message}\n`));
+          
+          // Clean up
+          try {
+            await fs.rm(tempDir, { recursive: true, force: true });
+          } catch {}
+          
+          return;
+        }
+
+        sourceDir = tempDir;
+      }
+
+      // Update agents
+      spinner.text = 'Installing updated agents...';
+      
+      const commandsDir = path.join(sourceDir, 'installer', 'commands');
+      const hooksDir = path.join(sourceDir, 'installer', 'hooks');
+
+      for (const toolValue of config.tools) {
+        const tool = AI_TOOLS.find(t => t.value === toolValue);
+        if (!tool) continue;
+
+        await installForTool(cwd, tool, config.agents, commandsDir);
+        await installHooksForTool(cwd, tool, hooksDir, config.commitMode);
+      }
+
+      // Clean up temp directory if we cloned from remote
+      if (!options.source) {
+        const tempDir = path.join(cwd, '.pluto', 'temp-update');
+        try {
+          await fs.rm(tempDir, { recursive: true, force: true });
+        } catch {}
+      }
+
+      spinner.succeed(chalk.green('Agents updated successfully!'));
+      
+      console.log(chalk.cyan('\n═══════════════════════════════════════════'));
+      console.log(chalk.bold('\n📦 Updated:\n'));
+      
+      for (const toolValue of config.tools) {
+        const tool = AI_TOOLS.find(t => t.value === toolValue);
+        console.log(chalk.white(`  ${tool.name}:`));
+        for (const agentValue of config.agents) {
+          console.log(chalk.dim(`    • ${agentValue}`));
+        }
+      }
+      
+      console.log(chalk.cyan('\n═══════════════════════════════════════════\n'));
+
+    } catch (error) {
+      spinner.fail(chalk.red('Update failed'));
+      console.error(chalk.red(error.message + '\n'));
+    }
+  });
+
 program.parse();
 
 // Helper function to recursively find all markdown files in a directory
