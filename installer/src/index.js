@@ -177,7 +177,7 @@ async function installHooksForTool(cwd, tool, hooksDir) {
   // Copy hook scripts to .pluto/hooks
   await fs.mkdir(hooksDestDir, { recursive: true });
 
-  const hookFiles = ['on-stop.sh'];
+  const hookFiles = ['on-code-change.sh'];
   for (const hookFile of hookFiles) {
     const src = path.join(hooksDir, hookFile);
     const dest = path.join(hooksDestDir, hookFile);
@@ -203,16 +203,17 @@ async function installHooksForTool(cwd, tool, hooksDir) {
     settings.hooks = {};
   }
 
-  // Add Stop hook
-  if (!settings.hooks.Stop) {
-    settings.hooks.Stop = [];
+  // Add PostToolUse hook for Write|Edit
+  if (!settings.hooks.PostToolUse) {
+    settings.hooks.PostToolUse = [];
   }
-  const stopHookExists = settings.hooks.Stop.some(
-    h => h.command && h.command.includes('on-stop.sh')
+  const postToolHookExists = settings.hooks.PostToolUse.some(
+    h => h.command && h.command.includes('on-code-change.sh')
   );
-  if (!stopHookExists) {
-    settings.hooks.Stop.push({
-      command: `.pluto/hooks/on-stop.sh`
+  if (!postToolHookExists) {
+    settings.hooks.PostToolUse.push({
+      matcher: 'Write|Edit',
+      command: `.pluto/hooks/on-code-change.sh`
     });
   }
 
