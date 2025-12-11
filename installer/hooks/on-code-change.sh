@@ -39,15 +39,16 @@ REL_PATH=$(python3 -c "import os; print(os.path.relpath('$FILE_PATH', '$GIT_ROOT
 # Extract the original user prompt from transcript
 PROMPT="(no prompt captured)"
 if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
+    # Get first user message, filter out ide_opened_file tags, get actual prompt text
     EXTRACTED=$(jq -rs '
-      [.[] | select(.type == "human")][0].message.content |
+      [.[] | select(.type == "user" and .userType == "external")][0].message.content |
       if type == "array" then
-        map(select(.type == "text").text) | join(" ")
+        map(select(.type == "text" and (.text | startswith("<ide_") | not)).text) | join(" ")
       else
         .
       end
     ' "$TRANSCRIPT_PATH" 2>/dev/null)
-    if [ -n "$EXTRACTED" ] && [ "$EXTRACTED" != "null" ]; then
+    if [ -n "$EXTRACTED" ] && [ "$EXTRACTED" != "null" ] && [ "$EXTRACTED" != "" ]; then
         PROMPT="$EXTRACTED"
     fi
 fi

@@ -25,7 +25,8 @@ const AI_TOOLS = [
 
 // Available agents/commands
 const AVAILABLE_AGENTS = [
-  { name: 'Pluto Snap', value: 'pluto-snap', description: 'Auto-commit with prompt tracking' },
+  { name: 'Pluto Snap', value: 'pluto-snap', description: 'Commit with prompt & explanation' },
+  { name: 'Pluto Start', value: 'pluto-start', description: 'Enable auto-commit tracking for session' },
   { name: 'Code Reviewer', value: 'code-reviewer', description: 'Reviews code for best practices and bugs' },
   { name: 'Test Generator', value: 'test-generator', description: 'Generates test suites for your code' },
   { name: 'Documentation Writer', value: 'doc-writer', description: 'Creates documentation for your codebase' },
@@ -76,27 +77,58 @@ program
 
     console.log(chalk.green(`\n✓ Selected: ${selectedTools.map(t => AI_TOOLS.find(a => a.value === t)?.name).join(', ')}\n`));
 
-    // Step 2: Select agents
-    const { selectedAgents } = await inquirer.prompt([
+    // Step 2: Select commit workflow (only for Claude Code)
+    let commitMode = 'none';
+    if (selectedTools.includes('claude-code')) {
+      const { workflow } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'workflow',
+          message: 'How should Pluto handle commits?',
+          choices: [
+            { name: 'Auto Mode - Automatically prompt to commit after each response', value: 'auto' },
+            { name: 'Manual Mode - Use /pluto-start to enable commits per session', value: 'manual' },
+            { name: 'Off - Only use /pluto-snap manually when needed', value: 'none' }
+          ],
+          default: 'manual'
+        }
+      ]);
+      commitMode = workflow;
+      console.log(chalk.green(`\n✓ Commit mode: ${commitMode}\n`));
+    }
+
+    // Step 3: Select additional agents/commands
+    // Filter agents based on commit mode - pluto-snap/pluto-start are auto-included based on mode
+    const coreAgents = ['pluto-snap', 'pluto-start'];
+    const additionalAgents = AVAILABLE_AGENTS.filter(a => !coreAgents.includes(a.value));
+
+    // Determine which core agents to install based on mode
+    let selectedAgents = [];
+    if (commitMode === 'auto' || commitMode === 'manual' || commitMode === 'none') {
+      selectedAgents.push('pluto-snap'); // Always include pluto-snap
+    }
+    if (commitMode === 'manual') {
+      selectedAgents.push('pluto-start'); // Include pluto-start for manual mode
+    }
+
+    // Ask about additional commands
+    const { extraAgents } = await inquirer.prompt([
       {
         type: 'checkbox',
-        name: 'selectedAgents',
-        message: 'Which commands would you like to install?',
-        choices: AVAILABLE_AGENTS.map(agent => ({
+        name: 'extraAgents',
+        message: 'Would you like any additional commands?',
+        choices: additionalAgents.map(agent => ({
           name: `${agent.name} - ${chalk.dim(agent.description)}`,
           value: agent.value,
-          checked: agent.value === 'pluto-snap' // Pre-select pluto-snap
+          checked: false
         })),
         pageSize: 10
       }
     ]);
 
-    if (selectedAgents.length === 0) {
-      console.log(chalk.yellow('\n⚠ No commands selected.\n'));
-      return;
-    }
+    selectedAgents = [...selectedAgents, ...extraAgents];
 
-    // Step 3: Install
+    // Step 4: Install
     const spinner = ora('Installing commands...').start();
 
     try {
@@ -109,14 +141,14 @@ program
         spinner.text = `Setting up ${tool.name}...`;
 
         await installForTool(cwd, tool, selectedAgents, commandsDir);
-        await installHooksForTool(cwd, tool, hooksDir);
+        await installHooksForTool(cwd, tool, hooksDir, commitMode);
       }
 
       // Save config
       await fs.mkdir(path.join(cwd, '.pluto'), { recursive: true });
       await fs.writeFile(
         path.join(cwd, '.pluto', 'config.json'),
-        JSON.stringify({ tools: selectedTools, agents: selectedAgents, version: '1.0.0' }, null, 2)
+        JSON.stringify({ tools: selectedTools, agents: selectedAgents, commitMode, version: '1.0.0' }, null, 2)
       );
 
       spinner.succeed(chalk.green('Installation complete!'));
@@ -168,7 +200,7 @@ program
 program.parse();
 
 // Hook installation function
-async function installHooksForTool(cwd, tool, hooksDir) {
+async function installHooksForTool(cwd, tool, hooksDir, commitMode) {
   if (!tool.settingsFile) return; // Tool doesn't support hooks
 
   const settingsPath = path.join(cwd, tool.settingsFile);
@@ -177,7 +209,8 @@ async function installHooksForTool(cwd, tool, hooksDir) {
   // Copy hook scripts to .pluto/hooks
   await fs.mkdir(hooksDestDir, { recursive: true });
 
-  const hookFiles = ['on-code-change.sh'];
+  // Copy all hooks (they'll be used based on mode)
+  const hookFiles = ['on-stop.sh', 'on-compact.sh'];
   for (const hookFile of hookFiles) {
     const src = path.join(hooksDir, hookFile);
     const dest = path.join(hooksDestDir, hookFile);
@@ -198,29 +231,50 @@ async function installHooksForTool(cwd, tool, hooksDir) {
     // No existing settings
   }
 
-  // Add hooks configuration
+  // Add hooks configuration based on mode
   if (!settings.hooks) {
     settings.hooks = {};
   }
 
-  // Add PostToolUse hook for Write|Edit
-  if (!settings.hooks.PostToolUse) {
-    settings.hooks.PostToolUse = [];
+  if (commitMode === 'auto') {
+    // Auto mode: Stop hook blocks until /pluto-snap is run
+    if (!settings.hooks.Stop) {
+      settings.hooks.Stop = [];
+    }
+    const stopHookExists = settings.hooks.Stop.some(
+      h => h.hooks?.some(hook => hook.command?.includes('on-stop.sh'))
+    );
+    if (!stopHookExists) {
+      settings.hooks.Stop.push({
+        hooks: [
+          {
+            type: 'command',
+            command: '$CLAUDE_PROJECT_DIR/.pluto/hooks/on-stop.sh'
+          }
+        ]
+      });
+    }
+  } else if (commitMode === 'manual') {
+    // Manual mode: PreCompact hook runs /pluto-snap before context summarization
+    // User starts tracking with /pluto-start command
+    if (!settings.hooks.PreCompact) {
+      settings.hooks.PreCompact = [];
+    }
+    const compactHookExists = settings.hooks.PreCompact.some(
+      h => h.hooks?.some(hook => hook.command?.includes('on-compact.sh'))
+    );
+    if (!compactHookExists) {
+      settings.hooks.PreCompact.push({
+        hooks: [
+          {
+            type: 'command',
+            command: '$CLAUDE_PROJECT_DIR/.pluto/hooks/on-compact.sh'
+          }
+        ]
+      });
+    }
   }
-  const postToolHookExists = settings.hooks.PostToolUse.some(
-    h => h.matcher === 'Write|Edit' && h.hooks?.some(hook => hook.command?.includes('on-code-change.sh'))
-  );
-  if (!postToolHookExists) {
-    settings.hooks.PostToolUse.push({
-      matcher: 'Write|Edit',
-      hooks: [
-        {
-          type: 'command',
-          command: '"$CLAUDE_PROJECT_DIR"/.pluto/hooks/on-code-change.sh'
-        }
-      ]
-    });
-  }
+  // 'none' mode: no hooks, user manually runs /pluto-snap
 
   // Ensure directory exists and write settings
   await fs.mkdir(path.dirname(settingsPath), { recursive: true });
