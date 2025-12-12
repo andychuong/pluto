@@ -38,16 +38,16 @@ async function discoverAvailableAgents() {
       // Get the value without extension (this will be the agent identifier)
       const value = file.destFilename.replace('.md', '');
       
-      // Create friendly names from the destination filename
-      const friendlyName = value
-        .split('-')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
+      // Use the original file name as-is for display
+      const friendlyName = file.originalName;
+      
+      // Description shows source location
+      const description = file.subdirectory ? `From ${file.subdirectory}/` : 'Command';
       
       return {
         name: friendlyName,
         value: value,
-        description: file.subdirectory ? `From ${file.subdirectory}/` : 'Command',
+        description: description,
         subdirectory: file.subdirectory,
         originalName: file.originalName
       };
