@@ -28,14 +28,9 @@ const PLUTO_ALLOWED_COMMANDS = [
   'git log',
   'git rev-parse',
   'git rev-parse --short HEAD',
-  'git stash',
-  'git checkout',
-  'git rebase',
-  'git reset',
+  'git rev-parse --show-toplevel',
   'git ls-files',
   'git ls-files --others --exclude-standard',
-  // Bash tools
-  'Bash',
   // Pluto slash commands
   '/pluto-snap',
   '/pluto-start'

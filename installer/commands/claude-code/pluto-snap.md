@@ -2,6 +2,8 @@
 
 Commit the current changes with the original prompt and an explanation of why you made the changes.
 
+**IMPORTANT**: Run git commands directly WITHOUT `cd`. Do NOT chain commands with `&&`. Run each command separately.
+
 ## Instructions
 
 1. **Get the original user prompt** from your conversation context (the task the user asked you to do)
@@ -59,9 +61,11 @@ M  src/utils/validation.ts
 M  src/pages/index.tsx
 ```
 
-Then run:
+Then run these commands separately (NOT chained with &&):
 ```bash
 git add -A
+```
+```bash
 git commit -m "feat: Add login form with email and password validation
 
 Prompt: Add a login form with email and password validation
