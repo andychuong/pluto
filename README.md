@@ -5,7 +5,7 @@ Pluto is a git workflow tool that integrates with AI coding agents. It automatic
 ## Installation
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/andychuong/pluto/alexis/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/andychuong/pluto/main/install.sh | bash
 ```
 
 Note: You can update the URL in the curl command to install from a different branch by replacing `main` with your desired branch name.
