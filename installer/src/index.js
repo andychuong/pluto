@@ -362,7 +362,7 @@ program
         if (!tool) continue;
 
         await installForTool(cwd, tool, config.agents, commandsDir);
-        await installHooksForTool(cwd, tool, hooksDir, config.commitMode);
+        await installHooksForTool(cwd, tool, hooksDir, config.commitMode, config.addToAllowList);
       }
 
       // Clean up temp directory
