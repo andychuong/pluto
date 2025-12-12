@@ -28,12 +28,6 @@ pluto update
 
 # Update from specific branch
 pluto update --branch main
-
-# Update from custom repository
-pluto update --repo https://github.com/yourusername/pluto
-
-# Update from local directory
-pluto update --source /path/to/local/pluto
 ```
 
 ### List available commands

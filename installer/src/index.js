@@ -243,10 +243,8 @@ program
 // Update command
 program
   .command('update')
-  .description('Update agents from remote or local source')
-  .option('-s, --source <path>', 'Local path to pluto repository')
+  .description('Update agents from remote repository')
   .option('-b, --branch <branch>', 'Git branch to pull from (default: main)', 'main')
-  .option('-r, --repo <url>', 'Git repository URL', 'https://github.com/andychuong/pluto')
   .action(async (options) => {
     const cwd = process.cwd();
     const configPath = path.join(cwd, '.pluto', 'config.json');
@@ -274,61 +272,43 @@ program
     const spinner = ora('Updating agents...').start();
 
     try {
-      let sourceDir;
+      // Pull from remote
+      const repo = 'https://github.com/andychuong/pluto';
+      spinner.text = `Pulling from ${repo} (${options.branch})...`;
+      
+      const tempDir = path.join(cwd, '.pluto', 'temp-update');
+      
+      // Remove temp dir if it exists
+      try {
+        await fs.rm(tempDir, { recursive: true, force: true });
+      } catch {}
+      
+      await fs.mkdir(tempDir, { recursive: true });
 
-      if (options.source) {
-        // Use local source
-        spinner.text = 'Using local source...';
-        sourceDir = path.resolve(options.source);
+      // Clone the repository
+      const { execSync } = await import('child_process');
+      try {
+        execSync(
+          `git clone --depth 1 --branch ${options.branch} ${repo} ${tempDir}`,
+          { stdio: 'pipe' }
+        );
+      } catch (error) {
+        spinner.fail(chalk.red('Failed to pull from remote'));
+        console.error(chalk.red(`Git error: ${error.message}\n`));
         
-        // Verify the local source exists and has the installer directory
-        try {
-          await fs.access(path.join(sourceDir, 'installer', 'commands'));
-        } catch {
-          spinner.fail(chalk.red('Invalid source directory'));
-          console.error(chalk.red('The specified directory does not contain pluto installer files.\n'));
-          return;
-        }
-      } else {
-        // Pull from remote
-        spinner.text = `Pulling from ${options.repo} (${options.branch})...`;
-        
-        const tempDir = path.join(cwd, '.pluto', 'temp-update');
-        
-        // Remove temp dir if it exists
+        // Clean up
         try {
           await fs.rm(tempDir, { recursive: true, force: true });
         } catch {}
         
-        await fs.mkdir(tempDir, { recursive: true });
-
-        // Clone the repository
-        const { execSync } = await import('child_process');
-        try {
-          execSync(
-            `git clone --depth 1 --branch ${options.branch} ${options.repo} ${tempDir}`,
-            { stdio: 'pipe' }
-          );
-        } catch (error) {
-          spinner.fail(chalk.red('Failed to pull from remote'));
-          console.error(chalk.red(`Git error: ${error.message}\n`));
-          
-          // Clean up
-          try {
-            await fs.rm(tempDir, { recursive: true, force: true });
-          } catch {}
-          
-          return;
-        }
-
-        sourceDir = tempDir;
+        return;
       }
 
       // Update agents
       spinner.text = 'Installing updated agents...';
       
-      const commandsDir = path.join(sourceDir, 'installer', 'commands');
-      const hooksDir = path.join(sourceDir, 'installer', 'hooks');
+      const commandsDir = path.join(tempDir, 'installer', 'commands');
+      const hooksDir = path.join(tempDir, 'installer', 'hooks');
 
       for (const toolValue of config.tools) {
         const tool = AI_TOOLS.find(t => t.value === toolValue);
@@ -338,13 +318,10 @@ program
         await installHooksForTool(cwd, tool, hooksDir, config.commitMode);
       }
 
-      // Clean up temp directory if we cloned from remote
-      if (!options.source) {
-        const tempDir = path.join(cwd, '.pluto', 'temp-update');
-        try {
-          await fs.rm(tempDir, { recursive: true, force: true });
-        } catch {}
-      }
+      // Clean up temp directory
+      try {
+        await fs.rm(tempDir, { recursive: true, force: true });
+      } catch {}
 
       spinner.succeed(chalk.green('Agents updated successfully!'));
       
