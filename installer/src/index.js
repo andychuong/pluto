@@ -13,18 +13,32 @@ const __dirname = path.dirname(__filename);
 
 const program = new Command();
 
-// Git commands used by Pluto commands that should be added to allow list
+// Commands that should be added to allow list
 const PLUTO_ALLOWED_COMMANDS = [
+  // Git commands used by Pluto
   'git status',
+  'git status --porcelain',
   'git diff',
+  'git diff --name-only',
+  'git diff --cached',
+  'git diff --cached --name-only',
   'git add',
+  'git add -A',
   'git commit',
   'git log',
   'git rev-parse',
+  'git rev-parse --short HEAD',
   'git stash',
   'git checkout',
   'git rebase',
-  'git reset'
+  'git reset',
+  'git ls-files',
+  'git ls-files --others --exclude-standard',
+  // Bash tools
+  'Bash',
+  // Pluto slash commands
+  '/pluto-snap',
+  '/pluto-start'
 ];
 
 // AI Tools configuration
@@ -184,17 +198,21 @@ program
     // Step 4: Ask about allow list (only for Claude Code)
     let addToAllowList = false;
     if (selectedTools.includes('claude-code')) {
+      console.log(chalk.cyan('\nCommands that will be added to the allow list:'));
+      PLUTO_ALLOWED_COMMANDS.forEach(cmd => console.log(chalk.dim(`  - ${cmd}`)));
+      console.log('');
+
       const { allowList } = await inquirer.prompt([
         {
           type: 'confirm',
           name: 'allowList',
-          message: `Add git commands to Claude's allow list? (${PLUTO_ALLOWED_COMMANDS.slice(0, 3).join(', ')}...)`,
+          message: `Add these ${PLUTO_ALLOWED_COMMANDS.length} commands to Claude's allow list?`,
           default: true
         }
       ]);
       addToAllowList = allowList;
       if (addToAllowList) {
-        console.log(chalk.green(`\n✓ Will add ${PLUTO_ALLOWED_COMMANDS.length} git commands to allow list\n`));
+        console.log(chalk.green(`\n✓ Will add ${PLUTO_ALLOWED_COMMANDS.length} commands to allow list\n`));
       }
     }
 
