@@ -8,12 +8,26 @@ Rewrite micro-commits into clean, consolidated commits with automatic failsafe r
 /consolidate [--plan <file>] [--no-qa] [--no-failsafe]
 ```
 
+## Core Principle: Meaningful Checkpoints
+
+Each consolidated commit should be a **meaningful checkpoint of working code** that:
+- Delivers identifiable value (a feature works, a component is complete)
+- Builds and passes tests
+- Is small enough to minimize merge conflicts
+- Could be independently reverted if needed
+
+**Target ratio:** 40-60% of original micro-commit count.
+- 20 micro-commits → 8-12 consolidated
+- 50 micro-commits → 20-30 consolidated
+
+**Key question:** "What can the user/system do now that it couldn't before?"
+
 ## Scope: Global Consolidation
 
 Consolidation is **global across all sessions**. When triggered:
 
 1. Gather ALL micro-commits since last push (from all concurrent sessions)
-2. The consolidation-agent groups them using session IDs as hints
+2. Group by delivered value / working feature
 3. Result is a unified clean history reflecting all sessions' work
 
 ```bash
@@ -225,13 +239,19 @@ Progress saved to `.ai-git/state.json`:
 ```
 ✓ Consolidation complete
 
-  23 micro-commits → 4 consolidated commits
-  
-  [A] feat(auth): add JWT middleware
-  [B] test(auth): add auth test suite
-  [C] feat(api): add protected routes
-  [D] docs: update API documentation
-  
+  20 micro-commits → 10 consolidated commits
+
+  [1] feat(scoring): implement weighted category scoring
+  [2] feat(analysis): detect anti-pattern commits
+  [3] feat(ui): display anti-pattern warnings
+  [4] feat(ai): add OpenAI client with retry logic
+  [5] feat(types): add AI analysis types
+  [6] feat(api): integrate AI analysis into route
+  [7] feat(ui): display AI insights in dashboard
+  [8] fix(ai): lazy-init client for build compatibility
+  [9] feat(ui): add commit activity chart
+  [10] fix(api): use Zod v4 error format
+
   All commits verified. Ready to push.
 ```
 
@@ -240,16 +260,21 @@ Progress saved to `.ai-git/state.json`:
 ```
 ⚠ Consolidation partially complete
 
-  23 micro-commits → 2 consolidated + 11 unconsolidated
-  
+  20 micro-commits → 7 consolidated + 6 unconsolidated
+
   Verified:
-  [A] feat(auth): add JWT middleware ✓
-  [B] test(auth): add auth test suite ✓
-  
-  Unconsolidated (11 micro-commits):
+  [1] feat(scoring): implement weighted category scoring ✓
+  [2] feat(analysis): detect anti-pattern commits ✓
+  [3] feat(ui): display anti-pattern warnings ✓
+  [4] feat(ai): add OpenAI client with retry logic ✓
+  [5] feat(types): add AI analysis types ✓
+  [6] feat(api): integrate AI analysis into route ✓
+  [7] feat(ui): display AI insights in dashboard ✓
+
+  Unconsolidated (6 micro-commits):
   Could not consolidate remaining commits after 3 attempts.
   Last error: "Cannot find module '../utils/hash'" at c15
-  
+
   Options:
   1. Push verified commits now, fix issues, consolidate rest later
   2. /recover to restore all micro-commits and try different approach
@@ -262,12 +287,12 @@ Progress saved to `.ai-git/state.json`:
 ✗ Consolidation failed
 
   Could not verify any consolidated commits.
-  
+
   Error: First commit failed build check.
   "Cannot find module 'jsonwebtoken'" - missing dependency?
-  
-  All 23 micro-commits preserved.
-  
+
+  All 20 micro-commits preserved.
+
   Suggestions:
   1. Check if dependencies were installed
   2. /recover --list to see recovery points

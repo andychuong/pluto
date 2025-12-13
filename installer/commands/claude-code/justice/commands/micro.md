@@ -1,6 +1,10 @@
 # /micro - Create Micro-Commit
 
-Create a micro-commit for the current changes. Run this after every file modification.
+Create a micro-commit for the current changes. **Run this after every file modification.**
+
+## Core Principle
+
+Since `/micro` runs after each file change, **each commit should contain exactly one file**. The `/consolidate` command will intelligently combine related micro-commits later.
 
 ## Usage
 ```
@@ -9,78 +13,98 @@ Create a micro-commit for the current changes. Run this after every file modific
 
 ## Behavior
 
-1. Verify changes before staging
-2. Stage the relevant files (prefer explicit over `git add -A`)
-3. Generate a micro-commit with full metadata
-4. Use the conventional commit format with session tracking
-
-## Before Committing
-
-Always verify what you're about to commit:
-
-```bash
-# See what's changed
-git status
-
-# Review the actual changes
-git diff                 # unstaged changes
-git diff --staged        # if already staged
-```
-
-Ensure only intended files are included. Prefer explicit staging:
-```bash
-git add src/auth/middleware.ts src/types/auth.ts
-```
-
-Over blanket staging:
-```bash
-git add -A  # Use sparingly — may include unintended files
-```
+1. Run `git status` and `git diff` to verify changes
+2. Stage the single changed file explicitly: `git add <file>`
+3. Commit with intent-focused message and session metadata
 
 ## Commit Message Format
 ```
-<type>(<scope>): <concise description>
+<intent — why this change matters>
 
 session: $SESSION_ID
 prompt: <current user prompt/task>
-reason: <specific reason for this file change>
-touched: <files changed>
+touched: <file changed>
 ```
 
-## Type Inference
+The first line should explain the **intent** or **purpose** — not describe what's obvious from the diff.
 
-- Adding new file → `feat` or `test`
-- Modifying existing → `feat`, `fix`, `refactor` based on intent
-- Config/tooling → `chore`
-- Documentation → `docs`
+## Writing Intent-Focused Messages
 
-## Example
+The intent line should be **descriptive enough to stand alone** — someone reading just the commit log should understand what problem was solved or what capability was added. Aim for a complete thought in 50-72 characters.
 
-User: /micro added validation function
+**Ask yourself:** "What does this enable?" or "What problem does this solve?"
 
-You should:
-1. Run `git add -A` (or specific files)
-2. Run `git commit` with message:
+❌ **Bad — describes the obvious:**
 ```
-feat(auth): add validation function
+create LoginPage.tsx
+```
+
+❌ **Bad — conventional commit noise:**
+```
+feat(auth): add login page component
+```
+
+❌ **Bad — too vague:**
+```
+fix bug
+```
+
+✅ **Good — explains the capability:**
+```
+allow users to authenticate with email/password credentials
+```
+
+✅ **Good — states the measurable improvement:**
+```
+reduce GitHub API calls from 101 to 1 using GraphQL batch query
+```
+
+✅ **Good — describes the user-facing change:**
+```
+display commit score distribution as interactive histogram
+```
+
+✅ **Good — captures the fix context:**
+```
+prevent rate limit errors by queueing requests with backoff
+```
+
+The file path is already in `touched:` — don't repeat it. The diff shows what changed — explain *why* and *what it enables*.
+
+## Example Workflow
+
+After creating `src/components/LoginPage.tsx`:
+
+```bash
+git add src/components/LoginPage.tsx
+git commit -m "allow users to authenticate with email/password
 
 session: ses_7x9k2m
-prompt: add authentication to api
-reason: added validation function
-touched: src/middleware/auth.ts
+prompt: add user authentication
+touched: src/components/LoginPage.tsx"
 ```
 
-## What Counts as One Micro-Commit
+After creating `src/components/LoginPage.module.css`:
 
-One **logical change** = one micro-commit. This may include multiple files if:
-- They're part of the same atomic operation (type + implementation)
-- They're meaningless without each other (function + import)
-- They were changed together for the same reason
+```bash
+git add src/components/LoginPage.module.css
+git commit -m "make login form responsive on mobile
 
-But always create separate micro-commits for:
-- A feature + an unrelated fix you noticed
-- Implementation + a later bug fix to it
-- Changes serving different user requests
+session: ses_7x9k2m
+prompt: add user authentication
+touched: src/components/LoginPage.module.css"
+```
+
+After fixing a bug in `src/api/client.ts`:
+
+```bash
+git add src/api/client.ts
+git commit -m "fix rate limiting by batching requests
+
+session: ses_7x9k2m
+prompt: fix GitHub API rate limit errors
+touched: src/api/client.ts"
+```
 
 ## Cross-Session Awareness
 
@@ -96,8 +120,8 @@ will untangle cross-session changes later using diffs and session IDs.
 
 ## Important
 
-- Never skip micro-commits
-- One logical change per commit (may span multiple files)
+- **One file per commit** — `/micro` runs after each file change
+- **Intent-focused messages** — explain why and what it enables
 - Always include session ID for later consolidation
-- Keep the short description under 50 chars
+- Keep the first line 50-72 chars (descriptive but concise)
 - Verify changes with `git status` / `git diff` before staging

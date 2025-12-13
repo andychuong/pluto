@@ -58,7 +58,14 @@ EOF
   Name: <name or derived>
   Base: <short sha>
   Log: .ai-git/session-log.md
+
+  Mode: Use /micro for all commits during this session
 ```
+
+**CRITICAL**: While this session is active, you MUST use `/micro` instead of regular git commits for ALL file changes. This ensures:
+- Every change is tracked with the session ID
+- Commits are logged to the session narrative
+- Changes can be consolidated later with `/consolidate`
 
 ### /session end
 
@@ -247,6 +254,7 @@ Complete narrative log with prompts and commits interleaved:
 
 ## Important
 
+- **While a session is active, ALWAYS use `/micro` for commits — never regular git commits**
 - If no session exists when making changes, auto-start one
 - Session ID must be included in every micro-commit
 - Suggest consolidation when ending a session
