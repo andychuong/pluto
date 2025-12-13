@@ -28,41 +28,54 @@ Base: abc123d
 
 ---
 
-WORK IN PROGRESS:
-  Micro-commits: 23
-  Files touched: 12
-  Prompts: 8
+WORK IN PROGRESS
+
+| Metric        | Count |
+|--------------|-------|
+| Micro-commits | 23    |
+| Files touched | 12    |
+| Prompts       | 8     |
 
 ---
 
-CONSOLIDATION ESTIMATE:
-  Current: 23 micro-commits
-  Estimated: 4-6 consolidated commits
-  
-  Likely groups:
-    • feat(auth): ~8 commits
-    • test(auth): ~4 commits
-    • feat(api): ~7 commits
-    • docs: ~4 commits
+CONSOLIDATION ESTIMATE
+
+Current: 23 micro-commits → Estimated: 4-6 consolidated commits
+
+| Type(Scope)   | Micro-commits | Est. Consolidated |
+|--------------|---------------|-------------------|
+| feat(auth)    | 8            | 1                 |
+| test(auth)    | 4            | 1                 |
+| feat(api)     | 7            | 1                 |
+| test(api)     | 3            | 1 (or merge)      |
+| docs          | 1            | 1                 |
+| **Total**     | **23**       | **4-5**           |
 
 ---
 
-FILES CHANGED:
-  src/middleware/auth.ts (new, 8 commits)
-  src/types/auth.ts (new, 3 commits)
-  src/utils/hash.ts (new, 4 commits)
-  tests/auth.test.ts (new, 4 commits)
-  docs/API.md (modified, 2 commits)
-  ... +7 more files
+FILES CHANGED
+
+| File                          | Status   | Commits |
+|------------------------------|----------|---------|
+| src/middleware/auth.ts       | new      | 8       |
+| src/types/auth.ts            | new      | 3       |
+| src/utils/hash.ts            | new      | 4       |
+| tests/auth.test.ts           | new      | 4       |
+| docs/API.md                  | modified | 2       |
+| src/routes/protected.ts      | new      | 2       |
+| ... +6 more files            |          |         |
 
 ---
 
-RECENT ACTIVITY:
-  [10:52] feat(api): add rate limiting to protected routes
-  [10:48] test(auth): add JWT expiration test
-  [10:45] feat(auth): add token refresh endpoint
-  [10:42] fix(auth): handle expired token edge case
-  [10:38] feat(auth): add JWT middleware
+RECENT ACTIVITY
+
+| Time  | Type(Scope) | Description                              |
+|-------|------------|------------------------------------------|
+| 10:52 | feat(api)   | add rate limiting to protected routes    |
+| 10:48 | test(auth)  | add JWT expiration test                  |
+| 10:45 | feat(auth)  | add token refresh endpoint               |
+| 10:42 | fix(auth)   | handle expired token edge case           |
+| 10:38 | feat(auth)  | add JWT middleware                       |
 
 ---
 
@@ -178,15 +191,32 @@ Estimate: 4-5 commits (depending on test grouping)
 
 ### No Commits Yet
 ```
+=== Pluto Session Summary ===
+
 Session: ses_7x9k2m
 Started: 2024-01-15 10:30:00 UTC (5m ago)
+Base: abc123d
+
+| Metric        | Count |
+|--------------|-------|
+| Micro-commits | 0     |
+| Files touched | 0     |
+| Prompts       | 0     |
 
 No commits yet. Start working!
 ```
 
 ### Large Session
 ```
-⚠ Large session detected (87 commits)
+=== Pluto Session Summary ===
+
+⚠ Large session detected
+
+| Metric        | Count |
+|--------------|-------|
+| Micro-commits | 87    |
+| Files touched | 45    |
+| Prompts       | 23    |
 
 Consider running /consolidate-plan to review proposed structure.
 Consolidating many commits at once increases complexity.
@@ -236,29 +266,40 @@ Base: 2fbb770
 
 ---
 
-WORK IN PROGRESS:
-  Micro-commits: 1
-  Files touched: 1
-  Prompts: 1
+WORK IN PROGRESS
+
+| Metric        | Count |
+|--------------|-------|
+| Micro-commits | 1     |
+| Files touched | 1     |
+| Prompts       | 1     |
 
 ---
 
-CONSOLIDATION ESTIMATE:
-  Current: 1 micro-commit
-  Estimated: 1 consolidated commit
-  
-  Likely groups:
-    • feat(commands): 1 commit
+CONSOLIDATION ESTIMATE
+
+Current: 1 micro-commit → Estimated: 1 consolidated commit
+
+| Type(Scope)      | Micro-commits | Est. Consolidated |
+|-----------------|---------------|-------------------|
+| feat(commands)   | 1            | 1                 |
+| **Total**        | **1**        | **1**             |
 
 ---
 
-FILES CHANGED:
-  .claude/commands/pluto-list.md (new, 1 commit)
+FILES CHANGED
+
+| File                                | Status | Commits |
+|------------------------------------|--------|---------|
+| .claude/commands/pluto-list.md     | new    | 1       |
 
 ---
 
-RECENT ACTIVITY:
-  [2 minutes ago] feat(commands): add pluto-list summary command
+RECENT ACTIVITY
+
+| Time         | Type(Scope)    | Description                       |
+|--------------|---------------|-----------------------------------|
+| 2 minutes ago | feat(commands) | add pluto-list summary command   |
 
 ---
 
