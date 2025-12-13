@@ -10,23 +10,61 @@ Convert micro-commits from a Pluto session into clean, consolidated commits.
 
 ## Overview
 
-This command takes all micro-commits from the current session and consolidates them into logical, meaningful commits through a simple three-step process:
+This command takes all micro-commits from the current session and consolidates them into logical, meaningful commits through a simple four-step process:
 
-1. **Analyze & Propose** - Review micro-commits and suggest consolidation groupings
-2. **User Review** - Show the plan and get confirmation
-3. **Execute & Verify** - Rewrite git history and run QA checks
+1. **Capture History** - Write unconsolidated git history to log file
+2. **Analyze & Propose** - Review micro-commits and suggest consolidation groupings
+3. **User Review** - Show the plan and get confirmation
+4. **Execute & Verify** - Rewrite git history and run QA checks
 
 ## Step-by-Step Behavior
 
-### Step 1: Analyze Micro-Commits
+### Step 1: Capture Unconsolidated Git History
 
-First, gather and analyze all micro-commits from the current session:
+Before doing anything else, write the current unconsolidated git history to a log file:
 
 ```bash
 # Get current session
 SESSION_ID=$(cat .ai-git/current-session)
 BASE_COMMIT=$(git log --grep="session: $SESSION_ID" --format="%H" | tail -1)^
 
+# Create pre-consolidation history log
+HISTORY_LOG=".ai-git/pre-consolidate-${SESSION_ID}.log"
+
+cat > $HISTORY_LOG << EOF
+# Pre-Consolidation Git History
+# Session: $SESSION_ID
+# Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+# Base Commit: $BASE_COMMIT
+# Current HEAD: $(git rev-parse HEAD)
+
+---
+
+EOF
+
+# Write detailed git log with full commit messages
+git log $BASE_COMMIT..HEAD --format="## Commit %H%n- **Short**: %h%n- **Date**: %ai%n- **Message**: %s%n%n%b%n----%n" >> $HISTORY_LOG
+
+# Also write one-liner summary
+echo "" >> $HISTORY_LOG
+echo "## Summary (one-line)" >> $HISTORY_LOG
+echo "" >> $HISTORY_LOG
+git log $BASE_COMMIT..HEAD --oneline >> $HISTORY_LOG
+```
+
+This creates a complete record at `.ai-git/pre-consolidate-${SESSION_ID}.log` containing:
+- Full commit hashes
+- Commit dates
+- Complete commit messages (including session metadata)
+- One-line summary
+
+**Purpose:** This log file preserves the exact unconsolidated state before any rewriting occurs, providing a complete historical reference.
+
+### Step 2: Analyze Micro-Commits
+
+Gather and analyze all micro-commits from the current session:
+
+```bash
 # List all micro-commits in this session
 git log $BASE_COMMIT..HEAD --oneline
 ```
@@ -37,7 +75,7 @@ Analyze the commits by examining:
 - File changes and dependencies
 - Temporal relationships
 
-### Step 2: Propose Consolidation Plan
+### Step 3: Propose Consolidation Plan
 
 Group micro-commits into logical consolidated commits based on:
 
@@ -99,7 +137,7 @@ Historical references: tuv901w, xyz234a
 Do you want to proceed with this consolidation? (yes/no)
 ```
 
-### Step 3: Execute Consolidation
+### Step 4: Execute Consolidation
 
 Once the user confirms, execute the consolidation:
 
@@ -178,7 +216,7 @@ If QA fails on any commit, report the issue and suggest options:
 - Fix the issue manually
 - Skip QA for this session
 
-### Step 4: Report Results
+### Step 5: Report Results
 
 Show a clear summary of what happened:
 
@@ -234,6 +272,7 @@ git reset --hard <commit-hash>
 
 ## Files Modified
 
+- `.ai-git/pre-consolidate-${SESSION_ID}.log` - Complete unconsolidated git history (new)
 - `.ai-git/pluto-log-${SESSION_ID}.md` - Updated with consolidation summary and micro-commit references
 - `.ai-git/recovery` - New recovery point added
 - Git history - Rewritten from base commit to HEAD
@@ -272,3 +311,5 @@ This creates a permanent record of which micro-commits were combined into each c
 - Session log preserves the full micro-commit history for reference
 - QA checks are recommended but can be skipped with user consent
 - If consolidation fails partway through, the rebase is aborted and user can recover
+
+
