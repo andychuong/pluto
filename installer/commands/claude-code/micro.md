@@ -98,3 +98,4 @@ EOF
 - ALWAYS append commit entry to `.ai-git/session-log.md` after committing
 - If no active session exists, auto-start one with `/session start`
 
+

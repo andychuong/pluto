@@ -81,8 +81,7 @@ RECENT ACTIVITY
 
 NEXT STEPS:
   • Continue working: keep making micro-commits
-  • Review plan: /consolidate-plan to see proposed grouping
-  • Consolidate: /consolidate to rewrite history
+  • Consolidate: /pluto-consolidate to rewrite history
   • View log: read .ai-git/pluto-log-ses_7x9k2m.md
 ```
 
@@ -218,7 +217,7 @@ No commits yet. Start working!
 | Files touched | 45    |
 | Prompts       | 23    |
 
-Consider running /consolidate-plan to review proposed structure.
+Consider running /pluto-consolidate to review proposed structure.
 Consolidating many commits at once increases complexity.
 ```
 
@@ -242,8 +241,7 @@ Order information by usefulness:
 ## Integration with Other Commands
 
 This command provides info to help decide:
-- **Ready to consolidate?** Use count and estimate
-- **Need more detail?** Run `/consolidate-plan`
+- **Ready to consolidate?** Run `/pluto-consolidate`
 - **Review work?** Read log file directly
 - **Too many commits?** Consider consolidating now
 
@@ -306,5 +304,5 @@ RECENT ACTIVITY
 NEXT STEPS:
   • Continue working on current task
   • Run /pluto-list again to see updated stats
-  • When ready: /consolidate-plan to review grouping
+  • When ready: /pluto-consolidate
 ```

@@ -26,3 +26,13 @@
 - **Prompt**: is there a way to make the view more tablular?
 
 ---
+
+## Commit Entry
+- **Timestamp**: 2025-12-13 04:25:57 UTC
+- **Files Changed**: .ai-git/pluto-log-ses_d02eecab.md,.claude/commands/pluto-list.md
+- **Type**: refactor(commands)
+- **Description**: convert pluto-list output to tabular format
+- **Reason**: improved readability by converting output sections to markdown tables for WIP stats, consolidation estimates, files changed, and recent activity
+- **Commit Hash**: 23b60db
+
+---

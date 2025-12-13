@@ -1,6 +1,6 @@
 # /pluto-start - Initialize Session-Based Development
 
-Start a tracked development session with automatic commit logging and micro-commit workflow.
+Start a tracked development session with automatic micro-commit workflow.
 
 ## Usage
 ```
@@ -11,7 +11,6 @@ Start a tracked development session with automatic commit logging and micro-comm
 
 Initializes a complete tracked development session by:
 1. Generating a unique session ID
-2. Recording the current HEAD as session base
 3. Creating an initial session commit
 4. Activating commit tracking
 5. Preparing for micro-commit workflow
@@ -25,24 +24,18 @@ Initializes a complete tracked development session by:
 SESSION_ID="ses_$(openssl rand -hex 4)"
 
 # Create .ai-git directory if needed
+# Should include in pluto init
 mkdir -p .ai-git
-
-# Save current session
-echo "$SESSION_ID" > .ai-git/current-session
-
-# Record base commit
-BASE_COMMIT=$(git rev-parse HEAD)
 ```
 
 ### 2. Create Session Start Commit
 
 ```bash
 # Create initial commit to mark session start
-git add .ai-git/current-session
+
 git commit --allow-empty -m "pluto: start session ${SESSION_ID}
 
 session: ${SESSION_ID}
-base: ${BASE_COMMIT}
 started: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 type: session-start"
 ```
@@ -51,9 +44,10 @@ type: session-start"
 
 ```
 Started Pluto session: ses_abc12345
-  Base: <short-sha>
   
 Session tracking active. All prompts and work will be tracked via commits.
+
+🛸 Note: Pluto sessions may not persist after compaction. To ensure Pluto is active run /pluto-start after compaction and when starting a new session
 ```
 
 ## Active Session Tracking Rules
@@ -62,19 +56,44 @@ Once the session is started, the following rules are automatically active:
 
 ### A. Commit Every Prompt
 
-Upon receiving ANY user prompt during this session, IMMEDIATELY create a commit BEFORE doing any work:
+Upon receiving ANY user prompt during this session, IMMEDIATELY create a commit BEFORE doing any work.
+
+**Purpose:** Capture conversational context that happens between the micro-commits. The micro-commits (Section B) already contain the prompt, reason, and file changes. This prompt commit captures any gaps: the conversation history, failed attempts, and context needed to understand WHY this prompt exists.
 
 ```bash
-SESSION_ID=$(cat .ai-git/current-session)
-
-# Create empty commit to log the prompt
+# Create empty commit to log the prompt with conversation context
 git commit --allow-empty -m "pluto: prompt received
 
 session: ${SESSION_ID}
 timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+intent: [high-level goal user is trying to accomplish]
+
+context: |
+  [Conversational gaps not captured in micro-commits]
+
+dependencies: [reference to earlier work this builds on, if any]
+
 prompt: [complete verbatim user prompt]
+
 type: prompt"
 ```
+
+**How to generate the metadata:**
+
+- **intent**: Extract or infer the user's high-level goal. Keep it concise (~1 line).
+  - Examples: "Add JWT authentication", "Fix mobile login button", "Refactor auth middleware"
+  
+- **context**: Capture conversational context that happens between the micro-commits.
+  - **DO include**: Conversation turns, failed attempts, user feedback, clarifications, constraints mentioned
+  - **DON'T include**: What files were changed, what code was written (micro-commits have this)
+  - Focus on the "why" behind this prompt, not the "what" that will be done
+  - If this is the first prompt or no conversation context exists, note "Initial request" or omit
+  - Keep to 2-4 bullet points maximum
+  
+- **dependencies**: Reference earlier work in this session that this prompt builds on or relates to.
+  - Examples: "Builds on auth middleware added earlier", "Related to LoginForm refactor"
+  - Omit if this is standalone work
 
 ### B. Create Micro-Commits
 
@@ -139,32 +158,6 @@ All session information is tracked via git commits with metadata.
 4. **Immediate Commits**: Create prompt commit BEFORE starting work, work commits IMMEDIATELY after each change
 5. **Git-Based Logging**: All tracking happens through git commit metadata, no separate log files
 6. **Never Skip**: Never skip a micro-commit, even for small changes
+7. **Micro-commits vs Prompt commits**: Micro-commits capture the "what" (work done, files changed, code written) as well as important context for the changes. Prompt commits capture the "why" between them (conversation history, failed attempts, user feedback that led to this prompt).
 
-## Example Session Flow
-
-```
-User: /pluto-start 
-
-Started Session: ses_7x9k2m
-  Base: abc123d
-  
-Session tracking active. All prompts and work will be tracked via commits.
-
----
-
-User: Add JWT authentication middleware
-
-[Creates prompt commit with session metadata]
-[Creates src/middleware/auth.ts]
-[Creates work commit with session metadata]
-
----
-
-User: Add password hashing utility
-
-[Creates prompt commit with session metadata]
-[Creates src/utils/hash.ts]
-[Creates work commit with session metadata]
-
----
 
