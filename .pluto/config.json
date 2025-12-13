@@ -1,0 +1,11 @@
+{
+  "tools": [
+    "claude-code"
+  ],
+  "agents": [
+    "pluto-snap",
+    "pluto-start"
+  ],
+  "commitMode": "manual",
+  "version": "1.0.0"
+}
