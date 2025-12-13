@@ -13,6 +13,29 @@ const __dirname = path.dirname(__filename);
 
 const program = new Command();
 
+// Commands that should be added to allow list
+const PLUTO_ALLOWED_COMMANDS = [
+  // Git commands used by Pluto
+  'git status',
+  'git status --porcelain',
+  'git diff',
+  'git diff --name-only',
+  'git diff --cached',
+  'git diff --cached --name-only',
+  'git add',
+  'git add -A',
+  'git commit',
+  'git log',
+  'git rev-parse',
+  'git rev-parse --short HEAD',
+  'git rev-parse --show-toplevel',
+  'git ls-files',
+  'git ls-files --others --exclude-standard',
+  // Pluto slash commands
+  '/pluto-snap',
+  '/pluto-start'
+];
+
 // AI Tools configuration
 const AI_TOOLS = [
   { name: 'Claude Code', value: 'claude-code', dir: '.claude/commands', settingsFile: '.claude/settings.json' },
@@ -118,7 +141,7 @@ program
     console.log(chalk.green(`\n✓ Selected: ${selectedTools.map(t => AI_TOOLS.find(a => a.value === t)?.name).join(', ')}\n`));
 
     // Step 2: Select commit workflow (only for Claude Code)
-    let commitMode = 'none';
+    let commitMode = 'manual';
     if (selectedTools.includes('claude-code')) {
       const { workflow } = await inquirer.prompt([
         {
@@ -127,8 +150,7 @@ program
           message: 'How should Pluto handle commits?',
           choices: [
             { name: 'Auto Mode - Automatically prompt to commit after each response', value: 'auto' },
-            { name: 'Manual Mode - Use /pluto-start to enable commits per session', value: 'manual' },
-            { name: 'Off - Only use /pluto-snap manually when needed', value: 'none' }
+            { name: 'Manual Mode - Use /pluto-start to enable commits per session', value: 'manual' }
           ],
           default: 'manual'
         }
@@ -168,11 +190,36 @@ program
 
     selectedAgents = [...selectedAgents, ...extraAgents];
 
-    // Step 4: Install
+    // Step 4: Ask about allow list (only for Claude Code)
+    let addToAllowList = false;
+    if (selectedTools.includes('claude-code')) {
+      console.log(chalk.cyan('\nCommands that will be added to the allow list:'));
+      PLUTO_ALLOWED_COMMANDS.forEach(cmd => console.log(chalk.dim(`  - ${cmd}`)));
+      console.log('');
+
+      const { allowList } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'allowList',
+          message: `Add these ${PLUTO_ALLOWED_COMMANDS.length} commands to Claude's allow list?`,
+          default: true
+        }
+      ]);
+      addToAllowList = allowList;
+      if (addToAllowList) {
+        console.log(chalk.green(`\n✓ Will add ${PLUTO_ALLOWED_COMMANDS.length} commands to allow list\n`));
+      }
+    }
+
+    // Step 5: Install
     const spinner = ora('Installing commands...').start();
 
+    // Check for and clean up previous Pluto installation
+    const cwd = process.cwd();
+    spinner.text = 'Checking for previous installation...';
+    await cleanupPreviousInstall(cwd);
+
     try {
-      const cwd = process.cwd();
       const commandsDir = path.join(__dirname, '..', 'commands');
       const hooksDir = path.join(__dirname, '..', 'hooks');
 
@@ -181,14 +228,14 @@ program
         spinner.text = `Setting up ${tool.name}...`;
 
         await installForTool(cwd, tool, selectedAgents, commandsDir);
-        await installHooksForTool(cwd, tool, hooksDir, commitMode);
+        await installHooksForTool(cwd, tool, hooksDir, commitMode, addToAllowList);
       }
 
       // Save config
       await fs.mkdir(path.join(cwd, '.pluto'), { recursive: true });
       await fs.writeFile(
         path.join(cwd, '.pluto', 'config.json'),
-        JSON.stringify({ tools: selectedTools, agents: selectedAgents, commitMode, version: '1.0.0' }, null, 2)
+        JSON.stringify({ tools: selectedTools, agents: selectedAgents, commitMode, addToAllowList, version: '1.0.0' }, null, 2)
       );
 
       spinner.succeed(chalk.green('Installation complete!'));
@@ -289,7 +336,7 @@ program
       const { execSync } = await import('child_process');
       try {
         execSync(
-          `git clone --depth 1 --branch ${options.branch} ${repo} ${tempDir}`,
+          `git clone --depth 1 --branch ${options.branch} "${repo}" "${tempDir}"`,
           { stdio: 'pipe' }
         );
       } catch (error) {
@@ -315,7 +362,7 @@ program
         if (!tool) continue;
 
         await installForTool(cwd, tool, config.agents, commandsDir);
-        await installHooksForTool(cwd, tool, hooksDir, config.commitMode);
+        await installHooksForTool(cwd, tool, hooksDir, config.commitMode, config.addToAllowList);
       }
 
       // Clean up temp directory
@@ -429,8 +476,85 @@ function generateDestinationFilename(files, extension) {
   return result;
 }
 
+// Clean up previous Pluto installation
+async function cleanupPreviousInstall(cwd) {
+  // Remove .pluto directory (hooks, config)
+  const plutoDir = path.join(cwd, '.pluto');
+  try {
+    await fs.rm(plutoDir, { recursive: true, force: true });
+  } catch {
+    // Directory doesn't exist, that's fine
+  }
+
+  // Remove Pluto commands from .claude/commands (only files that look like pluto commands)
+  const claudeCommandsDir = path.join(cwd, '.claude', 'commands');
+  try {
+    const files = await fs.readdir(claudeCommandsDir);
+    for (const file of files) {
+      // Only remove files that are pluto-related or were installed by pluto
+      if (file.startsWith('pluto-') || file.includes('-alexis') || file.includes('-justice')) {
+        await fs.unlink(path.join(claudeCommandsDir, file));
+      }
+    }
+  } catch {
+    // Directory doesn't exist, that's fine
+  }
+
+  // Clean up Pluto-specific settings from .claude/settings.json (but preserve other settings)
+  const settingsPath = path.join(cwd, '.claude', 'settings.json');
+  try {
+    const existing = await fs.readFile(settingsPath, 'utf-8');
+    const settings = JSON.parse(existing);
+
+    // Remove Pluto hooks but keep other hooks
+    if (settings.hooks) {
+      // Remove Stop hooks that reference pluto
+      if (settings.hooks.Stop) {
+        settings.hooks.Stop = settings.hooks.Stop.filter(
+          h => !h.hooks?.some(hook => hook.command?.includes('.pluto/'))
+        );
+        if (settings.hooks.Stop.length === 0) delete settings.hooks.Stop;
+      }
+      // Remove PreCompact hooks that reference pluto
+      if (settings.hooks.PreCompact) {
+        settings.hooks.PreCompact = settings.hooks.PreCompact.filter(
+          h => !h.hooks?.some(hook => hook.command?.includes('.pluto/'))
+        );
+        if (settings.hooks.PreCompact.length === 0) delete settings.hooks.PreCompact;
+      }
+      // Remove PostToolUse hooks that reference pluto
+      if (settings.hooks.PostToolUse) {
+        settings.hooks.PostToolUse = settings.hooks.PostToolUse.filter(
+          h => !h.hooks?.some(hook => hook.command?.includes('.pluto/'))
+        );
+        if (settings.hooks.PostToolUse.length === 0) delete settings.hooks.PostToolUse;
+      }
+
+      // Remove hooks object if empty
+      if (Object.keys(settings.hooks).length === 0) delete settings.hooks;
+    }
+
+    // Remove Pluto-added commands from allowedCommands but keep others
+    if (settings.allowedCommands) {
+      settings.allowedCommands = settings.allowedCommands.filter(
+        cmd => !PLUTO_ALLOWED_COMMANDS.includes(cmd)
+      );
+      if (settings.allowedCommands.length === 0) delete settings.allowedCommands;
+    }
+
+    // Write back cleaned settings (or delete if empty)
+    if (Object.keys(settings).length === 0) {
+      await fs.unlink(settingsPath);
+    } else {
+      await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2));
+    }
+  } catch {
+    // Settings file doesn't exist or can't be parsed, that's fine
+  }
+}
+
 // Hook installation function
-async function installHooksForTool(cwd, tool, hooksDir, commitMode) {
+async function installHooksForTool(cwd, tool, hooksDir, commitMode, addToAllowList = false) {
   if (!tool.settingsFile) return; // Tool doesn't support hooks
 
   const settingsPath = path.join(cwd, tool.settingsFile);
@@ -505,6 +629,19 @@ async function installHooksForTool(cwd, tool, hooksDir, commitMode) {
     }
   }
   // 'none' mode: no hooks, user manually runs /pluto-snap
+
+  // Add commands to allow list if requested
+  if (addToAllowList && tool.value === 'claude-code') {
+    if (!settings.allowedCommands) {
+      settings.allowedCommands = [];
+    }
+    // Add each command if not already present
+    for (const cmd of PLUTO_ALLOWED_COMMANDS) {
+      if (!settings.allowedCommands.includes(cmd)) {
+        settings.allowedCommands.push(cmd);
+      }
+    }
+  }
 
   // Ensure directory exists and write settings
   await fs.mkdir(path.dirname(settingsPath), { recursive: true });
