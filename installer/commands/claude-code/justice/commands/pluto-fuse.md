@@ -46,7 +46,7 @@ micro-commits get fused together.
 4. Run `qa-agent` on each fused commit sequentially
 5. If QA fails, trigger failsafe mechanism (unless `--no-failsafe`)
 6. Report results
-7. Clear all session state (all sessions' micro-commits are now fused)
+
 
 ## Execution Steps
 
@@ -239,7 +239,7 @@ Progress saved to `.ai-git/state.json`:
 ```
 ✓ Fusion complete
 
-  20 micro-commits → 10 fused commits
+  20 micro-commits → 10 plutos
 
   [1] feat(scoring): implement weighted category scoring
   [2] feat(analysis): detect anti-pattern commits

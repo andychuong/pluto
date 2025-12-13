@@ -4,8 +4,8 @@
   ],
   "agents": [
     "pluto-snap",
-    "consolidate"
+    "pluto-start"
   ],
-  "commitMode": "auto",
+  "commitMode": "manual",
   "version": "1.0.0"
 }
