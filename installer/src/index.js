@@ -336,7 +336,7 @@ program
       const { execSync } = await import('child_process');
       try {
         execSync(
-          `git clone --depth 1 --branch ${options.branch} ${repo} ${tempDir}`,
+          `git clone --depth 1 --branch ${options.branch} "${repo}" "${tempDir}"`,
           { stdio: 'pipe' }
         );
       } catch (error) {
