@@ -12,8 +12,8 @@ Start a tracked development session with automatic commit logging and micro-comm
 Initializes a complete tracked development session by:
 1. Generating a unique session ID
 2. Recording the current HEAD as session base
-3. Setting up session logging infrastructure
-4. Activating prompt and commit tracking
+3. Creating an initial session commit
+4. Activating commit tracking
 5. Preparing for micro-commit workflow
 
 ## Step-by-Step Behavior
@@ -22,7 +22,7 @@ Initializes a complete tracked development session by:
 
 ```bash
 # Generate session ID
-SESSION_ID="ses_$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 8)"
+SESSION_ID="ses_$(openssl rand -hex 4)"
 
 # Create .ai-git directory if needed
 mkdir -p .ai-git
@@ -34,18 +34,17 @@ echo "$SESSION_ID" > .ai-git/current-session
 BASE_COMMIT=$(git rev-parse HEAD)
 ```
 
-### 2. Initialize Pluto Log
+### 2. Create Session Start Commit
 
 ```bash
-# Create session-specific log file with header
-cat > .ai-git/pluto-log-${SESSION_ID}.md << EOF
-# Pluto Log - Session $SESSION_ID
+# Create initial commit to mark session start
+git add .ai-git/current-session
+git commit --allow-empty -m "pluto: start session ${SESSION_ID}
 
-- **Started**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-- **Base Commit**: $BASE_COMMIT
-
----
-EOF
+session: ${SESSION_ID}
+base: ${BASE_COMMIT}
+started: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+type: session-start"
 ```
 
 ### 3. Announce to User
@@ -53,30 +52,28 @@ EOF
 ```
 Started Pluto session: ses_abc12345
   Base: <short-sha>
-  Log: .ai-git/pluto-log-ses_abc12345.md
   
-All prompts and commits will be logged with Pluto.
+Session tracking active. All prompts and work will be tracked via commits.
 ```
 
 ## Active Session Tracking Rules
 
 Once the session is started, the following rules are automatically active:
 
-### A. Log Every Prompt
+### A. Commit Every Prompt
 
-Upon receiving ANY user prompt during this session, IMMEDIATELY append to `.ai-git/pluto-log-${SESSION_ID}.md` BEFORE doing any work:
+Upon receiving ANY user prompt during this session, IMMEDIATELY create a commit BEFORE doing any work:
 
 ```bash
 SESSION_ID=$(cat .ai-git/current-session)
 
-cat >> .ai-git/pluto-log-${SESSION_ID}.md << 'EOF'
+# Create empty commit to log the prompt
+git commit --allow-empty -m "pluto: prompt received
 
-## Prompt Entry
-- **Timestamp**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-- **Prompt**: [complete verbatim user prompt]
-
----
-EOF
+session: ${SESSION_ID}
+timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+prompt: [complete verbatim user prompt]
+type: prompt"
 ```
 
 ### B. Create Micro-Commits
@@ -93,33 +90,10 @@ After EVERY file change, create a micro-commit using this workflow:
    git commit -m "<type>(<scope>): <concise description>
    
    session: $SESSION_ID
+   timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
    prompt: <current user prompt/task>
    reason: <specific reason for this file change>
-   touched: <files changed>"
-   ```
-
-3. **Get commit hash**:
-   ```bash
-   COMMIT_HASH=$(git rev-parse HEAD)
-   SESSION_ID=$(cat .ai-git/current-session)
-   ```
-
-4. **Log to pluto-log**:
-   ```bash
-   FILES_CHANGED=$(git diff-tree --no-commit-id --name-only -r HEAD | tr '\n' ', ' | sed 's/,$//')
-   
-   cat >> .ai-git/pluto-log-${SESSION_ID}.md << EOF
-   
-   ## Commit Entry
-   - **Timestamp**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-   - **File Changed**: $FILES_CHANGED
-   - **Type**: <type>(<scope>)
-   - **Description**: <commit message title>
-   - **Reason**: <reason for change>
-   - **Commit Hash**: ${COMMIT_HASH:0:7}
-   
-   ---
-   EOF
+   type: work"
    ```
 
 ### C. Commit Type Inference
@@ -148,8 +122,9 @@ After running `/pluto-start`, these files will exist:
 ```
 .ai-git/
   current-session                  # Current session ID
-  pluto-log-{sessionID}.md        # Session-specific log (prompts + commits)
 ```
+
+All session information is tracked via git commits with metadata.
 
 ## Session States
 
@@ -158,11 +133,11 @@ After running `/pluto-start`, these files will exist:
 
 ## Important Notes
 
-1. **Automatic Tracking**: Once started, all prompts and commits are automatically logged
+1. **Automatic Tracking**: Once started, all prompts and commits are tracked via git commits
 2. **File Change = Commit**: Each file modification gets its own micro-commit
 3. **Session ID in Metadata**: Every commit includes the session ID for later consolidation
-4. **Immediate Logging**: Log prompt entries BEFORE starting work, commit entries IMMEDIATELY after each change
-5. **Session-Specific Logs**: Each session has its own `.ai-git/pluto-log-{sessionID}.md` file
+4. **Immediate Commits**: Create prompt commit BEFORE starting work, work commits IMMEDIATELY after each change
+5. **Git-Based Logging**: All tracking happens through git commit metadata, no separate log files
 6. **Never Skip**: Never skip a micro-commit, even for small changes
 
 ## Example Session Flow
@@ -172,27 +147,24 @@ User: /pluto-start
 
 Started Session: ses_7x9k2m
   Base: abc123d
-  Log: .ai-git/pluto-log-ses_7x9k2m.md
   
-Session tracking active. All prompts and commits will be logged.
+Session tracking active. All prompts and work will be tracked via commits.
 
 ---
 
 User: Add JWT authentication middleware
 
-[Logs prompt to .ai-git/pluto-log-ses_7x9k2m.md]
+[Creates prompt commit with session metadata]
 [Creates src/middleware/auth.ts]
-[Creates micro-commit with session metadata]
-[Logs commit to .ai-git/pluto-log-ses_7x9k2m.md]
+[Creates work commit with session metadata]
 
 ---
 
 User: Add password hashing utility
 
-[Logs prompt to .ai-git/pluto-log-ses_7x9k2m.md]
+[Creates prompt commit with session metadata]
 [Creates src/utils/hash.ts]
-[Creates micro-commit with session metadata]
-[Logs commit to .ai-git/pluto-log-ses_7x9k2m.md]
+[Creates work commit with session metadata]
 
 ---
 
