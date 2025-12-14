@@ -13,27 +13,53 @@ const __dirname = path.dirname(__filename);
 
 const program = new Command();
 
-// Commands that should be added to allow list
+// Specific commands used by Pluto agents/commands
 const PLUTO_ALLOWED_COMMANDS = [
-  // Git commands used by Pluto
+  // Git status/diff commands
   'git status',
   'git status --porcelain',
   'git diff',
   'git diff --name-only',
   'git diff --cached',
   'git diff --cached --name-only',
-  'git add',
+  // Git staging
   'git add -A',
+  // Git commits
   'git commit',
+  'git commit --allow-empty',
+  // Git log commands
   'git log',
-  'git rev-parse',
+  'git log -1',
+  'git log --oneline',
+  'git log --oneline -5',
+  'git log --grep="^session:"',
+  'git log --format="%H"',
+  'git log --format="%h %s"',
+  'git log --format="%b"',
+  // Git rev-parse
+  'git rev-parse HEAD',
   'git rev-parse --short HEAD',
   'git rev-parse --show-toplevel',
-  'git ls-files',
-  'git ls-files --others --exclude-standard',
-  // Pluto slash commands
-  '/pluto-snap',
-  '/pluto-start'
+  // Git stash (for QA checkout)
+  'git stash',
+  'git stash pop',
+  // Git checkout (for QA)
+  'git checkout',
+  'git checkout -',
+  // Git rebase (for consolidation)
+  'git rebase -i',
+  'git rebase --abort',
+  // Git reset (for recovery)
+  'git reset --hard',
+  // Git reflog (for recovery)
+  'git reflog',
+  // Directory/file operations for .ai-git
+  'mkdir -p .ai-git',
+  'rm -f .ai-git/state.json',
+  'rm -f .ai-git/current-session',
+  'rm -f .ai-git/sessions/*.json',
+  // Session ID generation
+  'openssl rand -hex 4',
 ];
 
 // AI Tools configuration
@@ -123,70 +149,30 @@ program
     
     console.log(chalk.yellow('\n📋 Let\'s set up Pluto for your project!\n'));
 
-    // Step 1: Select AI tools
-    const { selectedTools } = await inquirer.prompt([
+    // Claude Code is the only supported tool
+    const selectedTools = ['claude-code'];
+
+    // Install all available agents/commands
+    const selectedAgents = AVAILABLE_AGENTS.map(a => a.value);
+
+    // Step 1: Ask about allow list
+    console.log(chalk.cyan('\nCommands that will be added to the allow list:'));
+    PLUTO_ALLOWED_COMMANDS.forEach(cmd => console.log(chalk.dim(`  - ${cmd}`)));
+    console.log('');
+
+    const { addToAllowList } = await inquirer.prompt([
       {
-        type: 'checkbox',
-        name: 'selectedTools',
-        message: 'Which AI coding tools do you use?',
-        choices: AI_TOOLS.map(tool => ({
-          name: tool.name,
-          value: tool.value,
-          checked: false
-        })),
-        validate: (answer) => answer.length > 0 || 'Select at least one tool.'
+        type: 'confirm',
+        name: 'addToAllowList',
+        message: `Add these ${PLUTO_ALLOWED_COMMANDS.length} commands to Claude's allow list?`,
+        default: true
       }
     ]);
-
-    console.log(chalk.green(`\n✓ Selected: ${selectedTools.map(t => AI_TOOLS.find(a => a.value === t)?.name).join(', ')}\n`));
-
-    // Step 2: Select additional agents/commands
-    // Core agents are always included
-    const coreAgents = ['pluto-snap', 'pluto-start'];
-    const additionalAgents = AVAILABLE_AGENTS.filter(a => !coreAgents.includes(a.value));
-
-    // Always include core agents
-    let selectedAgents = ['pluto-snap', 'pluto-start'];
-
-    // Ask about additional commands
-    const { extraAgents } = await inquirer.prompt([
-      {
-        type: 'checkbox',
-        name: 'extraAgents',
-        message: 'Would you like any additional commands?',
-        choices: additionalAgents.map(agent => ({
-          name: `${agent.name} - ${chalk.dim(agent.description)}`,
-          value: agent.value,
-          checked: false
-        })),
-        pageSize: 10
-      }
-    ]);
-
-    selectedAgents = [...selectedAgents, ...extraAgents];
-
-    // Step 3: Ask about allow list (only for Claude Code)
-    let addToAllowList = false;
-    if (selectedTools.includes('claude-code')) {
-      console.log(chalk.cyan('\nCommands that will be added to the allow list:'));
-      PLUTO_ALLOWED_COMMANDS.forEach(cmd => console.log(chalk.dim(`  - ${cmd}`)));
-      console.log('');
-
-      const { allowList } = await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'allowList',
-          message: `Add these ${PLUTO_ALLOWED_COMMANDS.length} commands to Claude's allow list?`,
-          default: true
-        }
-      ]);
-      addToAllowList = allowList;
-      if (addToAllowList) {
-        console.log(chalk.green(`\n✓ Will add ${PLUTO_ALLOWED_COMMANDS.length} commands to allow list\n`));
-      }
+    if (addToAllowList) {
+      console.log(chalk.green(`\n✓ Will add ${PLUTO_ALLOWED_COMMANDS.length} commands to allow list\n`));
     }
 
-    // Step 4: Install
+    // Step 2: Install
     const spinner = ora('Installing commands...').start();
 
     // Check for and clean up previous Pluto installation
