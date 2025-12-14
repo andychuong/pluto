@@ -183,6 +183,10 @@ program
     try {
       const commandsDir = path.join(__dirname, '..', 'commands');
 
+      // Create .ai-git directory for session tracking
+      spinner.text = 'Creating .ai-git directory...';
+      await fs.mkdir(path.join(cwd, '.ai-git'), { recursive: true });
+
       for (const toolValue of selectedTools) {
         const tool = AI_TOOLS.find(t => t.value === toolValue);
         spinner.text = `Setting up ${tool.name}...`;
@@ -190,6 +194,11 @@ program
         await installForTool(cwd, tool, selectedAgents, commandsDir);
         await updateSettingsForTool(cwd, tool, addToAllowList);
       }
+
+      // Add .ai-git and .claude to .gitignore after folders are created
+      spinner.text = 'Updating .gitignore...';
+      await addToGitignore(cwd, '.ai-git');
+      await addToGitignore(cwd, '.claude');
 
       // Save config
       await fs.mkdir(path.join(cwd, '.pluto'), { recursive: true });
@@ -544,6 +553,29 @@ async function updateSettingsForTool(cwd, tool, addToAllowList = false) {
   // Ensure directory exists and write settings
   await fs.mkdir(path.dirname(settingsPath), { recursive: true });
   await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2));
+}
+
+// Add entry to .gitignore if not already present
+async function addToGitignore(cwd, entry) {
+  const gitignorePath = path.join(cwd, '.gitignore');
+  let content = '';
+
+  try {
+    content = await fs.readFile(gitignorePath, 'utf-8');
+  } catch {
+    // .gitignore doesn't exist, will create it
+  }
+
+  // Check if entry already exists (as a line by itself)
+  const lines = content.split('\n');
+  const entryExists = lines.some(line => line.trim() === entry);
+
+  if (!entryExists) {
+    // Add entry with a newline if file doesn't end with one
+    const separator = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
+    const newContent = content + separator + entry + '\n';
+    await fs.writeFile(gitignorePath, newContent);
+  }
 }
 
 // Installation functions
