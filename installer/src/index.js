@@ -359,6 +359,57 @@ program
     }
   });
 
+// Uninstall command
+program
+  .command('uninstall')
+  .description('Uninstall Pluto from your system')
+  .action(async () => {
+    const { confirmUninstall } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'confirmUninstall',
+        message: 'Are you sure you want to uninstall Pluto from your system?',
+        default: false
+      }
+    ]);
+
+    if (!confirmUninstall) {
+      console.log(chalk.yellow('\nUninstall cancelled.\n'));
+      return;
+    }
+
+    const spinner = ora('Uninstalling Pluto...').start();
+
+    try {
+      const homeDir = process.env.HOME || process.env.USERPROFILE;
+      const installDir = path.join(homeDir, '.pluto');
+      const binLocations = [
+        path.join('/usr/local/bin', 'pluto'),
+        path.join(homeDir, '.local', 'bin', 'pluto')
+      ];
+
+      // Remove symlinks
+      for (const binPath of binLocations) {
+        try {
+          await fs.unlink(binPath);
+          spinner.text = `Removed ${binPath}`;
+        } catch {
+          // Symlink doesn't exist, that's fine
+        }
+      }
+
+      // Remove installation directory
+      spinner.text = `Removing ${installDir}...`;
+      await fs.rm(installDir, { recursive: true, force: true });
+
+      spinner.succeed(chalk.green('Pluto uninstalled successfully!\n'));
+
+    } catch (error) {
+      spinner.fail(chalk.red('Uninstall failed'));
+      console.error(chalk.red(error.message + '\n'));
+    }
+  });
+
 program.parse();
 
 // Helper function to recursively find all markdown files in a directory
