@@ -101,7 +101,9 @@ To add new agent commands or prompts, place them in the `installer/commands` dir
 
 ## Team
 
-- Alex
-- Alexis
-- Andy
-- Justice
+<a href="https://github.com/alexander-t-ho"><img src="https://github.com/alexander-t-ho.png" width="60px" alt="Alexander Ho" /></a>
+<a href="https://github.com/amanyrath"><img src="https://github.com/amanyrath.png" width="60px" alt="Alexis Manyrath" /></a>
+<a href="https://github.com/andychuong"><img src="https://github.com/andychuong.png" width="60px" alt="Andy Chuong" /></a>
+<a href="https://github.com/Justiceleeg"><img src="https://github.com/Justiceleeg.png" width="60px" alt="Justice White" /></a>
+
+**Alexander Ho** · **Alexis Manyrath** · **Andy Chuong** · **Justice White**
