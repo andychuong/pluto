@@ -219,10 +219,11 @@ This file tracks all spin operations for audit purposes.
         await updateSettingsForTool(cwd, tool, addToAllowList);
       }
 
-      // Add .ai-git and .claude to .gitignore after folders are created
+      // Add .ai-git, .claude, and .pluto to .gitignore after folders are created
       spinner.text = 'Updating .gitignore...';
       await addToGitignore(cwd, '.ai-git');
       await addToGitignore(cwd, '.claude');
+      await addToGitignore(cwd, '.pluto');
 
       // Save config
       await fs.mkdir(path.join(cwd, '.pluto'), { recursive: true });
