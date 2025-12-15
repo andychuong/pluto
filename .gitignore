@@ -36,4 +36,7 @@ build/
 # Test files
 installer/test-*.js
 
+# Pluto session tracking
+.ai-git/
+
 COMMIT_MSG.md 
