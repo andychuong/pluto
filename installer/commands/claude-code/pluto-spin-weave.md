@@ -1,6 +1,6 @@
 # /pluto-spin-weave - Spin and Weave in One Step
 
-Consolidate fibers into clean threads AND merge with target branch to produce PR-ready code in one operation.
+Consolidate fibers into clean threads AND integrate with target branch to produce PR-ready code in one operation.
 
 ## Usage
 
@@ -17,11 +17,11 @@ Consolidate fibers into clean threads AND merge with target branch to produce PR
 This command combines `/pluto-spin` and `/pluto-weave` into a single streamlined workflow:
 
 1. Consolidates all fibers into clean threads (spin)
-2. Merges those threads with the target branch (weave)
-3. Validates the final state with QA
+2. Integrates those threads with the target branch (weave)
+3. Validates at each stage with QA
 4. Produces PR-ready code
 
-**Key simplification:** Only one QA validation at the very end, not after each step.
+**How it works:** A single interactive rebase onto the target branch accomplishes both goals simultaneously. The rebase consolidates your commits (spin) while also replaying them on top of the target (weave).
 
 ---
 
@@ -29,7 +29,7 @@ This command combines `/pluto-spin` and `/pluto-weave` into a single streamlined
 
 - **Fibers**: Individual atomic work commits (what pluto-start creates)
 - **Threads**: Clean, meaningful commits after spinning
-- **Weave**: Merging threads with remote changes
+- **Weave**: Integrating threads with remote changes
 - **Spin-Weave**: The complete operation in one command
 
 ---
@@ -42,13 +42,15 @@ Run comprehensive checks before starting:
 # Check for uncommitted changes
 git status --porcelain
 
-# Check for fibers to spin
-git log origin/main..HEAD --format="%H %s"
-
-# Verify target branch exists
+# Fetch latest remote state
 git fetch origin
 TARGET=${TARGET:-origin/main}
+
+# Verify target branch exists
 git rev-parse --verify ${TARGET}
+
+# Check for fibers to spin
+git log ${TARGET}..HEAD --format="%H %s"
 ```
 
 **Fail conditions:**
@@ -68,7 +70,7 @@ Collect all information needed for planning:
 ### 2a. Local Fibers and Threads
 
 ```bash
-# Get all commits since last push
+# Get all commits since divergence from target
 git log ${TARGET}..HEAD --format="%H|%s" --reverse
 ```
 
@@ -89,7 +91,7 @@ For each commit, extract:
 If any raw commits are detected (commits without Pluto metadata that aren't conventional commits):
 
 ```
-⚠ Raw commits detected
+Raw commits detected
 
 Found X raw commit(s) that are not Pluto Fibers:
 
@@ -118,18 +120,18 @@ Which would you prefer? (a/b)
   ```
   Suggested workflow:
   1. Run /pluto-rewrite to convert raw commits into Pluto Fibers
-  2. Run /pluto-weave to merge with target branch
+  2. Run /pluto-spin-weave again
   
-  Or to consolidate first:
+  Or use separate commands for more control:
   1. Run /pluto-rewrite
   2. Run /pluto-spin to consolidate fibers into threads
-  3. Run /pluto-weave to merge
+  3. Run /pluto-weave to integrate with remote
   ```
 
 ### 2b. Remote Commits
 
 ```bash
-# Get remote commits we don't have
+# Get remote commits we'll be rebasing onto
 git log HEAD..${TARGET} --format="%H|%s" --reverse
 ```
 
@@ -150,10 +152,10 @@ Present a simple, focused plan to the user:
 Spin-Weave Plan
 ===============
 
-Target: origin/main (X remote commits)
+Target: origin/main (X commits ahead of your branch)
 
-Proposed Threads:
------------------
+Spin (Thread Groupings):
+------------------------
 1. feat(auth): implement JWT middleware
    Fibers: f1, f2, f5 (3 fibers)
    Files: src/auth/middleware.ts, src/auth/types.ts
@@ -166,9 +168,10 @@ Proposed Threads:
    Fibers: f6, f7 (2 fibers)
    Files: src/auth/middleware.test.ts
 
-Weave:
-------
-Will merge with origin/main after spinning threads.
+Weave (Remote Integration):
+---------------------------
+Your threads will be rebased onto origin/main.
+Potential conflicts in: src/auth/middleware.ts (modified in both)
 
 Ready to proceed? (y/n)
 ```
@@ -192,7 +195,7 @@ Ready to proceed? (y/n)
 
 ## Step 4: Save Recovery Point
 
-Before any destructive operations, save a single recovery point:
+Before any destructive operations, save a recovery point:
 
 ```bash
 # Pre-compute date to avoid command substitution
@@ -203,13 +206,26 @@ mkdir -p .ai-git
 echo "${REV} ${TIMESTAMP} pre-spin-weave" >> .ai-git/recovery
 ```
 
-**Why single recovery point:** Simpler state management. If anything goes wrong, rollback undoes the entire operation.
+Also create/update state file:
+
+```bash
+cat > .ai-git/state.json << 'EOF'
+{
+  "operation": "spin-weave",
+  "status": "in_progress",
+  "phase": "starting",
+  "target": "${TARGET}",
+  "recovery_point": "${REV}",
+  "started": "${TIMESTAMP}"
+}
+EOF
+```
 
 ---
 
-## Step 5: Execute Spin (Rebase)
+## Step 5: Execute Spin-Weave (Interactive Rebase)
 
-Use spin logic from `pluto-spin.md` to consolidate fibers into threads:
+The interactive rebase onto TARGET accomplishes both spin and weave in one operation:
 
 ```bash
 git rebase -i ${TARGET}
@@ -220,38 +236,11 @@ git rebase -i ${TARGET}
 2. `fixup` all subsequent fibers in the group
 3. `reword` to set the final thread commit message
 
-**Skip:** The QA validation that `pluto-spin` normally does. We'll validate once at the end.
+**During rebase, conflicts may occur.** This is the "weave" part - integrating your changes with remote updates.
 
-**On rebase failure:**
-```bash
-git rebase --abort
-echo "✗ Spin failed during rebase"
-echo "Recovery available: /pluto-recover"
-exit 1
-```
+### Conflict Resolution (AI-Driven)
 
-**On success:** All fibers are now consolidated into clean threads. Proceed to Step 6.
-
----
-
-## Step 6: Execute Weave (Merge)
-
-Use weave logic from `pluto-weave.md` to merge with target branch:
-
-### 6a. Fetch and Merge
-
-```bash
-git fetch origin
-git merge --no-commit --no-ff ${TARGET}
-```
-
-**If clean merge (no conflicts):** Skip to Step 7 (QA Validation).
-
-**If conflicts:** Proceed to Step 6b (Resolve Conflicts).
-
-### 6b. Resolve Conflicts (AI-Driven)
-
-For each conflicted file, apply the decision framework from `pluto-weave.md`:
+For each conflict during rebase:
 
 ```bash
 # Identify conflicts
@@ -261,8 +250,8 @@ CONFLICTS=$(git diff --name-only --diff-filter=U)
 **For each conflict, work through:**
 
 1. **What is local trying to accomplish?**
-   - Reference the thread commit message
-   - Check metadata from fibers (intent, prompt, reason)
+   - Reference the fiber commit messages
+   - Check metadata (intent, prompt, reason)
    - What user goal does this serve?
 
 2. **What is remote trying to accomplish?**
@@ -299,10 +288,11 @@ Choice: merged
 Reasoning: Combined local's detailed error messages with remote's error code standardization. Results in better error handling than either alone.
 ```
 
-Then resolve and stage:
+Then resolve and continue:
 ```bash
 # Edit file to implement your decision
 git add <file>
+git rebase --continue
 ```
 
 **Escalate to Human:**
@@ -324,39 +314,43 @@ Question for you: Which authentication strategy should we use?
 My recommendation: JWT aligns with the stateless API design in other parts of the codebase, but sessions may be required for specific business requirements I'm not aware of.
 ```
 
-Then wait for human response before proceeding.
+Then wait for human response before continuing rebase.
 
-**Verify resolution complete:**
-
+**On rebase failure (unrecoverable):**
 ```bash
-# No conflict markers remain
-git grep -n "<<<<<<< HEAD" && echo "MARKERS FOUND - INCOMPLETE" || echo "OK"
-
-# Check for whitespace issues
-git diff --check
+git rebase --abort
+echo "Spin-Weave failed during rebase"
+echo "Recovery available: /pluto-recover"
 ```
+
+**On success:** All fibers are now consolidated into clean threads, rebased onto TARGET. Proceed to Step 6.
 
 ---
 
-## Step 7: Final QA Validation
+## Step 6: Post-Spin QA Validation
 
-This is the only QA pass - validates everything at once.
+After the rebase completes, validate the thread groupings before proceeding:
 
-Invoke the **weave-qa-agent** to validate the final merged state:
+```bash
+# Update state
+# phase: "validating-spin"
+```
+
+Invoke the **weave-qa-agent** to validate the spun state:
 
 ```
 Context to pass to weave-qa-agent:
-- All changes are staged (merged state)
+- Threads are created but not yet finalized
 - Validation should cover: pre-checks, lint, build, test
 - Return structured pass/fail results
 ```
 
-**On QA pass:** Proceed to Step 8 (Commit).
+**On QA pass:** Proceed to Step 7.
 
 **On QA failure:**
 
 1. Report what failed with error details
-2. Identify if issue is from spin groupings or weave resolutions
+2. Identify if issue is from thread groupings
 3. Attempt automatic fixes if possible:
    - Lint errors: Auto-fix with linter
    - Import errors: Add missing imports
@@ -364,80 +358,121 @@ Context to pass to weave-qa-agent:
 4. Re-run QA validation
 5. If still failing after 2-3 fix attempts, escalate to human:
    ```
-   QA Failures:
+   QA Failures after Spin:
    
    1. Build error: Cannot find module '../utils/auth'
       Likely cause: Thread grouping separated implementation from imports
       
    2. Test failure: AuthMiddleware.test.ts - JWT validation fails
-      Likely cause: Conflict resolution chose wrong implementation
+      Likely cause: Related code was split across threads
    
    Would you like to:
    (a) Abort and recover (rolls back entire operation)
    (b) Fix manually and continue
-   (c) Skip failing tests (not recommended)
    ```
 
-**Iterate until QA passes or user chooses to abort.**
-
 ---
 
-## Step 8: Commit Merge
+## Step 7: Final QA Validation
 
-Once QA passes, commit with a clean, human-readable message:
+Run final validation to ensure everything is ready for PR:
 
 ```bash
-git commit -m "Merge ${TARGET}: integrate local changes
-
-Merged remote updates with local development work.
-
-Spin summary:
-- X fibers consolidated into Y threads
-
-Threads created:
-- feat(auth): implement JWT middleware
-- fix(auth): resolve token expiration handling
-- test(auth): add JWT middleware tests
-
-Conflicts resolved:
-- src/auth/handler.ts: Merged both approaches for better error handling
-- src/auth/middleware.ts: Chose local implementation (better patterns)
-
-All validations passed."
+# Update state
+# phase: "validating-final"
 ```
 
-**Commit message should:**
-- Be readable by any developer
-- Explain what was spun and what was merged
-- Document conflict resolutions and reasoning
-- Not include internal metadata or pluto-specific markers
+Invoke the **weave-qa-agent** again:
+
+```
+Context to pass to weave-qa-agent:
+- Final state after spin-weave
+- Full validation: pre-checks, lint, build, test
+- Return structured pass/fail results
+```
+
+**On QA pass:** Proceed to Step 8.
+
+**On QA failure:** Same escalation process as Step 6.
 
 ---
 
-## Step 9: Report Results
+## Step 8: Report Results
 
 Show clear summary to user:
 
 ```
-✓ Spin-Weave complete
+Spin-Weave complete
 
 Spin:
-  20 fibers → 10 threads
+  X fibers consolidated into Y threads
+
+Threads created:
+  - feat(auth): implement JWT middleware
+  - fix(auth): resolve token expiration handling
+  - test(auth): add JWT middleware tests
 
 Weave:
-  Merged: origin/main
-  Conflicts resolved: 3 files
+  Rebased onto: origin/main
+  Conflicts resolved: N files
 
-Summary of decisions:
-  - src/auth/handler.ts: Merged both approaches - better error handling
-  - src/auth/middleware.ts: Chose local - consistent with patterns
-  - src/config/auth.ts: Chose remote - aligns with architecture
+Conflict resolutions:
+  - src/auth/handler.ts: Merged both approaches for better error handling
+  - src/auth/middleware.ts: Chose local implementation (consistent with patterns)
+
+QA Status:
+  Lint: passed
+  Build: passed
+  Tests: passed
 
 Next steps:
-  Ready to push! Review the final commit and push when ready.
+  Ready to push! Review the commits and push when ready.
 
   git log --oneline -10  # Review recent commits
   git push origin HEAD   # Push PR-ready code
+```
+
+---
+
+## Step 9: Cleanup Prompt
+
+After successful completion, offer to clean up session artifacts:
+
+```
+Spin-weave complete successfully.
+
+Would you like to clean up session artifacts?
+  - .ai-git/recovery entry for this operation
+  - .ai-git/state.json
+
+This removes temporary tracking data. Recovery will no longer be available for this operation.
+
+Clean up? (y/n)
+```
+
+**If user chooses yes:**
+```bash
+# Remove state file
+rm -f .ai-git/state.json
+
+# Remove the recovery entry for this operation (keep others)
+# This requires parsing the recovery file - simplest approach is to
+# remove lines matching the current recovery point
+grep -v "${RECOVERY_POINT}" .ai-git/recovery > .ai-git/recovery.tmp
+mv .ai-git/recovery.tmp .ai-git/recovery
+
+# If recovery file is now empty, remove it
+[ ! -s .ai-git/recovery ] && rm -f .ai-git/recovery
+
+# If .ai-git directory is now empty, remove it
+rmdir .ai-git 2>/dev/null || true
+
+echo "Cleanup complete."
+```
+
+**If user chooses no:**
+```
+Keeping session artifacts. You can manually clean up later or run /pluto-recover if needed.
 ```
 
 ---
@@ -454,16 +489,16 @@ Next steps:
 
 ## Error Handling
 
-### Any Failure Before QA
+### Rebase Failure
 
-If rebase or merge fails:
+If rebase fails and cannot be resolved:
 
 ```bash
 # Abort the operation
-git rebase --abort || git merge --abort
+git rebase --abort
 
 # Report to user
-echo "✗ Spin-Weave failed during ${PHASE}"
+echo "Spin-Weave failed during rebase"
 echo ""
 echo "Recovery available:"
 echo "  /pluto-recover - Restore to pre-spin-weave state"
@@ -474,7 +509,6 @@ echo "  Run /pluto-spin and /pluto-weave separately for more control"
 
 ### QA Failures
 
-- Keep merged state staged (don't commit)
 - Report what failed with details
 - Attempt automatic fixes
 - Iterate or offer manual resolution
@@ -488,7 +522,7 @@ Track operation state in `.ai-git/state.json`:
 {
   "operation": "spin-weave",
   "status": "in_progress",
-  "phase": "weaving",
+  "phase": "spinning",
   "target": "origin/main",
   "recovery_point": "abc123def",
   "started": "2025-12-14T10:30:00Z",
@@ -511,34 +545,31 @@ Track operation state in `.ai-git/state.json`:
 }
 ```
 
-**Update status as you progress:** planning → spinning → weaving → validating → complete
+**Update status as you progress:** planning -> spinning -> validating-spin -> validating-final -> complete
 
 ---
 
 ## Key Principles
 
-1. **Streamlined workflow** - One command from fibers to PR-ready code
-2. **Simple plan** - Just show thread groupings and target branch
-3. **Single QA pass** - Validate only the final merged state
-4. **Single recovery point** - All-or-nothing rollback
-5. **AI-driven decisions** - Resolve conflicts automatically when possible
-6. **Document everything** - Every decision needs clear reasoning
-7. **Never break the build** - Validate before committing
-8. **Clean commits** - Messages are for humans, not tools
+1. **Single operation** - One interactive rebase does both spin and weave
+2. **Two QA passes** - Validate after spin, validate after completion
+3. **Single recovery point** - All-or-nothing rollback
+4. **AI-driven decisions** - Resolve conflicts automatically when possible
+5. **Document everything** - Every decision needs clear reasoning
+6. **Never break the build** - Validate before considering complete
+7. **Clean commits** - Messages are for humans, not tools
+8. **Clean up after** - Offer to remove session artifacts
 
 ---
 
-## Benefits Over Separate Commands
+## How It Works
 
-**Speed:** One QA pass instead of two
+The key insight is that `git rebase -i TARGET` accomplishes both goals:
 
-**Simplicity:** One confirmation instead of multiple
+1. **Spin**: The interactive rebase lets you squash/fixup commits together, consolidating fibers into threads
+2. **Weave**: Rebasing onto TARGET replays your commits on top of the latest remote, integrating remote changes
 
-**Efficiency:** Complete workflow in one operation
-
-**Convenience:** From fibers to PR-ready in one step
-
-**Trade-off:** If thread groupings cause issues, you'll find out during final QA rather than earlier. But the happy path is much faster and cleaner.
+This is simpler and more reliable than trying to do a separate merge after rebasing.
 
 ---
 
@@ -546,14 +577,14 @@ Track operation state in `.ai-git/state.json`:
 
 Use `/pluto-spin` and `/pluto-weave` separately if:
 
-- You want to validate thread groupings before weaving
-- You need to push threads before merging
+- You want to validate thread groupings in isolation
+- You need to push threads before integrating with remote
 - You want more granular control over the process
-- You're working with a particularly complex merge
+- You prefer a merge commit over rebased history
 
 Use `/pluto-spin-weave` when:
 
 - You want PR-ready code quickly
-- You trust the AI to consolidate and merge correctly
-- You have a reasonably clean merge expected
+- You prefer linear history (rebased commits)
+- You have a reasonably clean integration expected
 - You want the fastest workflow
