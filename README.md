@@ -29,15 +29,17 @@ Note: You can install from a different branch by replacing `main` with your desi
 pluto init
 ```
 
-### Update agents to latest versions
+### Update Pluto CLI
 
 ```bash
-# Update from default remote repository
+# Update Pluto CLI from default remote repository
 pluto update
 
 # Update from specific branch
 pluto update --branch main
 ```
+
+This updates the `pluto` command itself. To update agents in a project, run `pluto init` in that project directory.
 
 ### List available commands
 
