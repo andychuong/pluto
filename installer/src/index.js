@@ -14,52 +14,35 @@ const __dirname = path.dirname(__filename);
 const program = new Command();
 
 // Specific commands used by Pluto agents/commands
+// Uses Claude Code's permissions.allow format with Bash() glob patterns
 const PLUTO_ALLOWED_COMMANDS = [
   // Git status/diff commands
-  'git status',
-  'git status --porcelain',
-  'git diff',
-  'git diff --name-only',
-  'git diff --cached',
-  'git diff --cached --name-only',
+  'Bash(git status:*)',
+  'Bash(git diff:*)',
   // Git staging
-  'git add -A',
+  'Bash(git add:*)',
   // Git commits
-  'git commit',
-  'git commit --allow-empty',
+  'Bash(git commit:*)',
   // Git log commands
-  'git log',
-  'git log -1',
-  'git log --oneline',
-  'git log --oneline -5',
-  'git log --grep="^session:"',
-  'git log --format="%H"',
-  'git log --format="%h %s"',
-  'git log --format="%b"',
+  'Bash(git log:*)',
   // Git rev-parse
-  'git rev-parse HEAD',
-  'git rev-parse --short HEAD',
-  'git rev-parse --show-toplevel',
+  'Bash(git rev-parse:*)',
   // Git stash (for QA checkout)
-  'git stash',
-  'git stash pop',
+  'Bash(git stash:*)',
   // Git checkout (for QA)
-  'git checkout',
-  'git checkout -',
+  'Bash(git checkout:*)',
   // Git rebase (for consolidation)
-  'git rebase -i',
-  'git rebase --abort',
+  'Bash(git rebase:*)',
   // Git reset (for recovery)
-  'git reset --hard',
+  'Bash(git reset:*)',
   // Git reflog (for recovery)
-  'git reflog',
+  'Bash(git reflog:*)',
   // Directory/file operations for .ai-git
-  'mkdir -p .ai-git',
-  'rm -f .ai-git/state.json',
-  'rm -f .ai-git/current-session',
-  'rm -f .ai-git/sessions/*.json',
+  'Bash(mkdir -p .ai-git:*)',
+  'Bash(rm -f .ai-git/*)',
   // Session ID generation
-  'openssl rand -hex 4',
+  'Bash(openssl rand:*)',
+  'Bash(SESSION_ID=*)',
 ];
 
 // AI Tools configuration
@@ -614,12 +597,21 @@ async function cleanupPreviousInstall(cwd) {
       if (Object.keys(settings.hooks).length === 0) delete settings.hooks;
     }
 
-    // Remove Pluto-added commands from allowedCommands but keep others
+    // Remove Pluto-added commands from old allowedCommands format (deprecated)
     if (settings.allowedCommands) {
       settings.allowedCommands = settings.allowedCommands.filter(
         cmd => !PLUTO_ALLOWED_COMMANDS.includes(cmd)
       );
       if (settings.allowedCommands.length === 0) delete settings.allowedCommands;
+    }
+
+    // Remove Pluto-added commands from new permissions.allow format
+    if (settings.permissions?.allow) {
+      settings.permissions.allow = settings.permissions.allow.filter(
+        cmd => !PLUTO_ALLOWED_COMMANDS.includes(cmd)
+      );
+      if (settings.permissions.allow.length === 0) delete settings.permissions.allow;
+      if (Object.keys(settings.permissions).length === 0) delete settings.permissions;
     }
 
     // Write back cleaned settings (or delete if empty)
@@ -651,14 +643,18 @@ async function updateSettingsForTool(cwd, tool, addToAllowList = false) {
     // No existing settings
   }
 
-  // Add commands to allow list
-  if (!settings.allowedCommands) {
-    settings.allowedCommands = [];
+  // Add commands to permissions.allow using Claude Code's new format
+  if (!settings.permissions) {
+    settings.permissions = {};
   }
+  if (!settings.permissions.allow) {
+    settings.permissions.allow = [];
+  }
+  
   // Add each command if not already present
   for (const cmd of PLUTO_ALLOWED_COMMANDS) {
-    if (!settings.allowedCommands.includes(cmd)) {
-      settings.allowedCommands.push(cmd);
+    if (!settings.permissions.allow.includes(cmd)) {
+      settings.permissions.allow.push(cmd);
     }
   }
 
