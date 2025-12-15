@@ -34,17 +34,23 @@ Choose [1/2/3]:
 
 **Option 1 (Commit):**
 ```bash
+# Pre-compute date to avoid command substitution in commit message
+TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
 git add -A
 git commit -m "WIP: uncommitted changes
 
 type: work
-timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+timestamp: ${TIMESTAMP}
 reason: Uncommitted changes before rewrite"
 ```
 
 **Option 2 (Stash):**
 ```bash
-git stash push -u -m "pluto-rewrite: auto-stash $(date -Iseconds)"
+# Pre-compute date to avoid command substitution in stash message
+TIMESTAMP=$(date -Iseconds)
+
+git stash push -u -m "pluto-rewrite: auto-stash ${TIMESTAMP}"
 ```
 After successful rewrite, restore with `git stash pop`.
 
@@ -118,7 +124,11 @@ Call qa-orchestrator with the plan (see `installer/agents/qa-orchestrator.md`). 
 ## Step 4: Save Recovery Point
 
 ```bash
-echo "$(git rev-parse HEAD) $(date -Iseconds) pre-rewrite" >> .ai-git/recovery
+# Pre-compute date to avoid command substitution
+TIMESTAMP=$(date -Iseconds)
+REV=$(git rev-parse HEAD)
+
+echo "${REV} ${TIMESTAMP} pre-rewrite" >> .ai-git/recovery
 ```
 
 Skip with `--no-failsafe` (not recommended).
@@ -147,7 +157,7 @@ For each thread: `pick` first commit, `fixup` rest, `reword` to conventional for
 ✓ Rewrite complete: X commits → Y threads
   [If QA adjusted] Plan adjusted, merged some groupings
   [If stashed] Restored uncommitted changes
-  Ready to push.
+  Ready to push. Run /pluto-weave to merge in any remote changes first.
 ```
 
 Or on failure:

@@ -40,3 +40,6 @@ installer/test-*.js
 .ai-git/
 
 COMMIT_MSG.md 
+.ai-git
+.claude
+.pluto

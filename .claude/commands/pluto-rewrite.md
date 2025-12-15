@@ -20,15 +20,36 @@ Each thread should be a **meaningful checkpoint of working code**. Ask: "What ca
 git status --porcelain
 ```
 
-**If uncommitted changes exist, auto-stash them:**
+**If uncommitted changes exist, ask user:**
 
+```
+You have uncommitted changes. What would you like to do?
+
+1. Commit now - changes will be included in the rewrite
+2. Stash - changes will be restored after rewrite
+3. Abort - handle manually
+
+Choose [1/2/3]:
+```
+
+**Option 1 (Commit):**
+```bash
+git add -A
+git commit -m "WIP: uncommitted changes
+
+type: work
+timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+reason: Uncommitted changes before rewrite"
+```
+
+**Option 2 (Stash):**
 ```bash
 git stash push -u -m "pluto-rewrite: auto-stash $(date -Iseconds)"
 ```
+After successful rewrite, restore with `git stash pop`.
 
-Tell user: "Stashed uncommitted changes. Will restore after rewrite completes."
-
-After successful rewrite, restore with `git stash pop`. If rewrite fails, tell user to run `git stash pop` manually.
+**Option 3 (Abort):**
+Exit and let user handle manually.
 
 ---
 
@@ -126,7 +147,7 @@ For each thread: `pick` first commit, `fixup` rest, `reword` to conventional for
 ✓ Rewrite complete: X commits → Y threads
   [If QA adjusted] Plan adjusted, merged some groupings
   [If stashed] Restored uncommitted changes
-  Ready to push.
+  Ready to push. Run /pluto-weave to merge in any remote changes first.
 ```
 
 Or on failure:
