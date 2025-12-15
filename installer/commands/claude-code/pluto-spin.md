@@ -45,6 +45,19 @@ Spinning is **global across all sessions**. Gather all unspun fibers since last 
 
 Only fibers (`type: work`) get spun. Threads are never re-consolidated. Conversation commits (`type: prompt`) inform the spin but aren't preserved as separate commits - their context should be incorporated into thread commit messages.
 
+**Check for non-Pluto commits:**
+
+After analyzing commits, count how many have Pluto metadata vs how many are "raw" commits (no `type:` metadata and not clean conventional commit threads).
+
+If raw commits are found, inform the user:
+
+```
+Found X commits with Pluto metadata, Y without.
+Consider /pluto-rewrite if you need to clean up non-Pluto commits.
+```
+
+This is informational only - proceed with spinning the fibers regardless. Raw commits will be left as-is since spin only operates on fibers.
+
 **Output:** List of fibers and conversation commits to process.
 
 ---
@@ -134,7 +147,11 @@ Proceed to rebase with adjusted plan
 Before any destructive operation, save current state.
 
 ```bash
-echo "$(git rev-parse HEAD) $(date -Iseconds) pre-spin" >> .ai-git/recovery
+# Pre-compute date to avoid command substitution
+TIMESTAMP=$(date -Iseconds)
+REV=$(git rev-parse HEAD)
+
+echo "${REV} ${TIMESTAMP} pre-spin" >> .ai-git/recovery
 ```
 
 **Why:** Enables `/pluto-recover` if anything goes wrong during rebase.

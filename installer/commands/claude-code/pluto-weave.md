@@ -174,8 +174,12 @@ done
 Before any destructive operation:
 
 ```bash
+# Pre-compute date to avoid command substitution
+TIMESTAMP=$(date -Iseconds)
+REV=$(git rev-parse HEAD)
+
 mkdir -p .ai-git
-echo "$(git rev-parse HEAD) $(date -Iseconds) pre-weave" >> .ai-git/recovery
+echo "${REV} ${TIMESTAMP} pre-weave" >> .ai-git/recovery
 ```
 
 ---
@@ -404,9 +408,12 @@ If user declines, preserve all artifacts for reference.
 If the weave fails at any step, log the failure:
 
 ```bash
+# Pre-compute date to avoid command substitution
+TIMESTAMP=$(date -Iseconds)
+
 mkdir -p .ai-git
 cat >> .ai-git/weave-failures.log << EOF
-## Failed Weave: $(date -Iseconds)
+## Failed Weave: ${TIMESTAMP}
 
 **Target:** ${TARGET}
 **Step Failed:** <step number and name>

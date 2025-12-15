@@ -32,11 +32,13 @@ SESSION_ID="ses_$(openssl rand -hex 4)"
 
 ```bash
 # Create initial commit to mark session start
+# Pre-compute date to avoid command substitution in commit message
+TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
 git commit --allow-empty -m "pluto: start session ${SESSION_ID}
 
 session: ${SESSION_ID}
-started: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+started: ${TIMESTAMP}
 type: session-start"
 ```
 
@@ -67,10 +69,13 @@ Upon receiving ANY user prompt during this session, IMMEDIATELY create a commit 
 
 ```bash
 # Create empty commit to log the prompt with conversation context
+# Pre-compute date to avoid command substitution in commit message
+TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
 git commit --allow-empty -m "pluto: conversation
 
 session: ${SESSION_ID}
-timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+timestamp: ${TIMESTAMP}
 
 intent: [high-level goal user is trying to accomplish]
 
@@ -112,10 +117,13 @@ After EVERY file change, create a fiber using this workflow:
 2. **Commit with full context metadata**:
    ```bash
    # Template format
+   # Pre-compute date to avoid command substitution in commit message
+   TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+   
    git commit -m "<concise description of change>
 
    session: ${SESSION_ID}
-   timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+   timestamp: ${TIMESTAMP}
    intent: <high-level goal user is trying to accomplish>
    prompt: <current user prompt/task>
    context: <conversational gaps - failed attempts, clarifications, feedback>
