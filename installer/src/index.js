@@ -695,27 +695,51 @@ async function installForTool(cwd, tool, agents, commandsDir) {
 
   switch (tool.value) {
     case 'claude-code': {
-      const destDir = path.join(cwd, '.claude', 'commands');
-      await fs.mkdir(destDir, { recursive: true });
+      // Install commands to .claude/commands/
+      const commandsDestDir = path.join(cwd, '.claude', 'commands');
+      await fs.mkdir(commandsDestDir, { recursive: true });
 
-      // Find all markdown files recursively
+      // Find command files (top-level .md files, not in agents/ subdirectory)
       const allFiles = await findMarkdownFilesRecursive(toolCommandsDir, toolCommandsDir, ['.md']);
-      
+      const commandFiles = allFiles.filter(f => !f.subdirectory.startsWith('agents'));
+
       // Generate destination filenames with conflict resolution
-      const fileMap = generateDestinationFilename(allFiles, '.md');
-      
+      const commandFileMap = generateDestinationFilename(commandFiles, '.md');
+
       // Filter to only install selected agents if agents array is provided
-      // Match against both the destination filename (without extension) and original basename
-      // This allows selecting either 'micro' (installs all) or 'micro-justice-commands' (installs specific)
-      const filesToInstall = agents && agents.length > 0 
-        ? fileMap.filter(f => {
+      const commandsToInstall = agents && agents.length > 0
+        ? commandFileMap.filter(f => {
             const destValue = f.destFilename.replace('.md', '');
             return agents.includes(destValue) || agents.includes(f.originalName);
           })
-        : fileMap;
+        : commandFileMap;
 
-      for (const { sourcePath, destFilename } of filesToInstall) {
-        const dest = path.join(destDir, destFilename);
+      for (const { sourcePath, destFilename } of commandsToInstall) {
+        const dest = path.join(commandsDestDir, destFilename);
+        try {
+          await fs.copyFile(sourcePath, dest);
+        } catch (error) {
+          // Skip if file can't be copied
+        }
+      }
+
+      // Install agents to .claude/agents/
+      const agentsDestDir = path.join(cwd, '.claude', 'agents');
+      await fs.mkdir(agentsDestDir, { recursive: true });
+
+      // Find agent files (in agents/ subdirectory)
+      const agentFiles = allFiles.filter(f => f.subdirectory.startsWith('agents'));
+      const agentFileMap = generateDestinationFilename(agentFiles, '.md');
+
+      const agentsToInstall = agents && agents.length > 0
+        ? agentFileMap.filter(f => {
+            const destValue = f.destFilename.replace('.md', '');
+            return agents.includes(destValue) || agents.includes(f.originalName);
+          })
+        : agentFileMap;
+
+      for (const { sourcePath, destFilename } of agentsToInstall) {
+        const dest = path.join(agentsDestDir, destFilename);
         try {
           await fs.copyFile(sourcePath, dest);
         } catch (error) {
