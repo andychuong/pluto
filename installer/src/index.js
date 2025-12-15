@@ -187,6 +187,30 @@ program
       spinner.text = 'Creating .ai-git directory...';
       await fs.mkdir(path.join(cwd, '.ai-git'), { recursive: true });
 
+      // Initialize state.json
+      const initialState = {
+        sessions_spun: [],
+        status: "idle",
+        initialized: new Date().toISOString()
+      };
+      await fs.writeFile(
+        path.join(cwd, '.ai-git', 'state.json'),
+        JSON.stringify(initialState, null, 2)
+      );
+
+      // Initialize pluto-log.md
+      const logHeader = `# Pluto Session Log
+
+This file tracks all spin operations for audit purposes.
+
+---
+
+`;
+      await fs.writeFile(
+        path.join(cwd, '.ai-git', 'pluto-log.md'),
+        logHeader
+      );
+
       for (const toolValue of selectedTools) {
         const tool = AI_TOOLS.find(t => t.value === toolValue);
         spinner.text = `Setting up ${tool.name}...`;
@@ -259,7 +283,7 @@ program
 // Update command
 program
   .command('update')
-  .description('Update agents from remote repository')
+  .description('Update Pluto CLI and agents from remote repository')
   .option('-b, --branch <branch>', 'Git branch to pull from (default: main)', 'main')
   .action(async (options) => {
     const cwd = process.cwd();
@@ -320,6 +344,40 @@ program
         return;
       }
 
+      // Reinstall Pluto CLI
+      spinner.text = 'Reinstalling Pluto CLI...';
+      const homeDir = process.env.HOME || process.env.USERPROFILE;
+      const plutoInstallDir = path.join(homeDir, '.pluto');
+      const installerDir = path.join(tempDir, 'installer');
+
+      try {
+        // Remove existing installation
+        await fs.rm(plutoInstallDir, { recursive: true, force: true });
+
+        // Copy new installer to ~/.pluto
+        await fs.mkdir(plutoInstallDir, { recursive: true });
+        await fs.cp(installerDir, plutoInstallDir, { recursive: true });
+
+        // Install dependencies
+        execSync('npm install --silent', {
+          cwd: plutoInstallDir,
+          stdio: 'pipe'
+        });
+
+        // Make entry point executable
+        await fs.chmod(path.join(plutoInstallDir, 'src', 'index.js'), 0o755);
+      } catch (error) {
+        spinner.fail(chalk.red('Failed to reinstall Pluto CLI'));
+        console.error(chalk.red(`Error: ${error.message}\n`));
+
+        // Clean up
+        try {
+          await fs.rm(tempDir, { recursive: true, force: true });
+        } catch {}
+
+        return;
+      }
+
       // Update agents
       spinner.text = 'Installing updated agents...';
 
@@ -338,19 +396,21 @@ program
         await fs.rm(tempDir, { recursive: true, force: true });
       } catch {}
 
-      spinner.succeed(chalk.green('Agents updated successfully!'));
-      
+      spinner.succeed(chalk.green('Pluto updated successfully!'));
+
       console.log(chalk.cyan('\n═══════════════════════════════════════════'));
       console.log(chalk.bold('\n📦 Updated:\n'));
-      
+
+      console.log(chalk.white('  Pluto CLI'));
+
       for (const toolValue of config.tools) {
         const tool = AI_TOOLS.find(t => t.value === toolValue);
-        console.log(chalk.white(`  ${tool.name}:`));
+        console.log(chalk.white(`  ${tool.name} agents:`));
         for (const agentValue of config.agents) {
           console.log(chalk.dim(`    • ${agentValue}`));
         }
       }
-      
+
       console.log(chalk.cyan('\n═══════════════════════════════════════════\n'));
 
     } catch (error) {

@@ -1,6 +1,6 @@
 # /pluto-start - Initialize Session-Based Development
 
-Start a tracked development session with automatic micro-commit workflow.
+Start a tracked development session with automatic fiber workflow.
 
 ## Usage
 ```
@@ -13,7 +13,11 @@ Initializes a complete tracked development session by:
 1. Generating a unique session ID
 3. Creating an initial session commit
 4. Activating commit tracking
-5. Preparing for micro-commit workflow
+5. Preparing for fiber workflow
+
+## Key Concepts
+
+**Fibers**: Atomic work commits created after every file change. Each fiber captures a single logical change with full context (prompt, reason, timestamp). Think of fibers as individual threads that weave together to form the complete fabric of your development session.
 
 ## Step-by-Step Behavior
 
@@ -22,10 +26,6 @@ Initializes a complete tracked development session by:
 ```bash
 # Generate session ID
 SESSION_ID="ses_$(openssl rand -hex 4)"
-
-# Create .ai-git directory if needed
-# Should include in pluto init
-mkdir -p .ai-git
 ```
 
 ### 2. Create Session Start Commit
@@ -54,15 +54,20 @@ Note: Pluto sessions may not persist after compaction. To ensure Pluto is active
 
 Once the session is started, the following rules are automatically active:
 
+**Workflow for each user prompt:**
+1. FIRST: Create prompt commit (Section A) - captures conversation context
+2. THEN: Do the work (write code, make changes)
+3. AFTER EACH FILE CHANGE: Create fiber (Section B) - captures what was done
+
 ### A. Commit Every Prompt
 
 Upon receiving ANY user prompt during this session, IMMEDIATELY create a commit BEFORE doing any work.
 
-**Purpose:** Capture conversational context that happens between the micro-commits. The micro-commits (Section B) already contain the prompt, reason, and file changes. This prompt commit captures any gaps: the conversation history, failed attempts, and context needed to understand WHY this prompt exists.
+**Purpose:** Capture conversational context that happens between the fibers. The fibers (Section B) already contain the prompt, reason, and file changes. This prompt commit captures any gaps: the conversation history, failed attempts, and context needed to understand WHY this prompt exists.
 
 ```bash
 # Create empty commit to log the prompt with conversation context
-git commit --allow-empty -m "pluto: prompt received
+git commit --allow-empty -m "pluto: conversation
 
 session: ${SESSION_ID}
 timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
@@ -84,9 +89,9 @@ type: prompt"
 - **intent**: Extract or infer the user's high-level goal. Keep it concise (~1 line).
   - Examples: "Add JWT authentication", "Fix mobile login button", "Refactor auth middleware"
   
-- **context**: Capture conversational context that happens between the micro-commits.
+- **context**: Capture conversational context that happens between the fibers.
   - **DO include**: Conversation turns, failed attempts, user feedback, clarifications, constraints mentioned
-  - **DON'T include**: What files were changed, what code was written (micro-commits have this)
+  - **DON'T include**: What files were changed, what code was written (fibers have this)
   - Focus on the "why" behind this prompt, not the "what" that will be done
   - If this is the first prompt or no conversation context exists, note "Initial request" or omit
   - Keep to 2-4 bullet points maximum
@@ -95,68 +100,64 @@ type: prompt"
   - Examples: "Builds on auth middleware added earlier", "Related to LoginForm refactor"
   - Omit if this is standalone work
 
-### B. Create Micro-Commits
+### B. Create Fibers
 
-After EVERY file change, create a micro-commit using this workflow:
+After EVERY file change, create a fiber using this workflow:
 
 1. **Stage changes**:
    ```bash
    git add -A
    ```
 
-2. **Commit with session metadata**:
+2. **Commit with full context metadata**:
    ```bash
-   git commit -m "<type>(<scope>): <concise description>
-   
-   session: $SESSION_ID
+   # Template format
+   git commit -m "<concise description of change>
+
+   session: ${SESSION_ID}
    timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+   intent: <high-level goal user is trying to accomplish>
    prompt: <current user prompt/task>
+   context: <conversational gaps - failed attempts, clarifications, feedback>
+   dependencies: <reference to earlier work this builds on, if any>
    reason: <specific reason for this file change>
    type: work"
    ```
 
-### C. Commit Type Inference
+   **Example of actual execution:**
+   ```bash
+   # The agent actually runs this with real values
+   git commit -m "add JWT authentication middleware
 
-Choose the appropriate commit type based on the change:
-- `feat` - new feature or functionality
-- `fix` - bug fix
-- `refactor` - code refactoring
-- `test` - adding or updating tests
-- `docs` - documentation changes
-- `style` - formatting, styling
-- `chore` - maintenance, dependencies, config
+   session: ses_7x9k2m
+   timestamp: 2025-12-13 14:31:15 UTC
+   intent: Add JWT authentication
+   prompt: Add JWT authentication middleware
+   context: Initial request
+   dependencies: none
+   reason: Create core JWT validation middleware with token verification
+   type: work"
+   ```
+
+Each fiber is fully self-contained with ALL context (intent, prompt, context, dependencies, reason). No need to find the preceding prompt commit to understand "why" - this simplifies `/pluto-weave` consolidation since each fiber is a complete unit.
 
 ## Session Commands Available
 
 Once started, these session commands become available:
 
-### /pluto-consolidate 
+### /pluto-spin
 
-### /pluto-ship
-
-## File Structure
-
-After running `/pluto-start`, these files will exist:
-
-```
-.ai-git/
-  current-session                  # Current session ID
-```
+### /pluto-weave
 
 All session information is tracked via git commits with metadata.
 
-## Session States
-
-- **ACTIVE** - In progress, receiving micro-commits
-- **ENDED** - Session finished
 
 ## Important Notes
 
 1. **Automatic Tracking**: Once started, all prompts and commits are tracked via git commits
-2. **File Change = Commit**: Each file modification gets its own micro-commit
+2. **File Change = Commit**: Each file modification gets its own fiber
 3. **Session ID in Metadata**: Every commit includes the session ID for later consolidation
 4. **Immediate Commits**: Create prompt commit BEFORE starting work, work commits IMMEDIATELY after each change
 5. **Git-Based Logging**: All tracking happens through git commit metadata, no separate log files
-6. **Never Skip**: Never skip a micro-commit, even for small changes
-7. **Micro-commits vs Prompt commits**: Micro-commits capture the "what" (work done, files changed, code written) as well as important context for the changes. Prompt commits capture the "why" between them (conversation history, failed attempts, user feedback that led to this prompt).
-
+6. **Never Skip**: Never skip a fiber, even for small changes
+7. **Fibers vs Prompt commits**: Fibers capture the "what" (work done, files changed, code written) as well as important context for the changes. Prompt commits capture the "why" between them (conversation history, failed attempts, user feedback that led to this prompt).
