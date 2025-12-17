@@ -72,16 +72,18 @@ Read conversation commits to understand decisions, clarifications, and context. 
 - Write better thread commit messages that capture the "why"
 - Understand relationships between fibers
 
-**Grouping criteria:**
-- Same feature or functionality
-- Implementation + immediate bug fixes
-- Related files (source + tests + types)
-- Fix-ups (typos, missing imports)
+**Grouping criteria (favor granularity to minimize merge conflicts):**
+- Same file or tightly-coupled module (changes that must ship together)
+- A fiber + its immediate fix-ups (typos, missing imports)
+- Minimum viable shippable unit—what's the smallest set of changes that works?
 
-**Keep separate:**
-- Different features
-- Refactoring vs new features
-- Config/dependency changes vs application code
+**Keep separate (each should be its own thread):**
+- Tests (can merge independently from implementation)
+- Type definitions (often conflict-prone, isolate them)
+- Config/dependency changes (affects everyone, ship alone)
+- Different files unless they truly can't function without each other
+
+**Anti-pattern:** Don't group by "user task" or "feature"—that's how the work was requested, not how it should ship. A single user request often spans multiple shippable units.
 
 **Present the plan and get user confirmation:**
 

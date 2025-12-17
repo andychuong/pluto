@@ -17,7 +17,7 @@ Initializes a complete tracked development session by:
 
 ## Key Concepts
 
-**Fibers**: Atomic work commits created after every file change. Each fiber captures a single logical change with full context (prompt, reason, timestamp). Think of fibers as individual threads that weave together to form the complete fabric of your development session.
+**Fibers**: Atomic work commits created after every file change. Each fiber captures a single logical change with full context (prompt, reason, timestamp). When you run `/pluto-spin`, related fibers are spun together into **threads**—clean, meaningful commits ready for review.
 
 ## Step-by-Step Behavior
 
@@ -147,7 +147,7 @@ After EVERY file change, create a fiber using this workflow:
    type: work"
    ```
 
-Each fiber is fully self-contained with ALL context (intent, prompt, context, dependencies, reason). No need to find the preceding prompt commit to understand "why" - this simplifies `/pluto-weave` consolidation since each fiber is a complete unit.
+Each fiber is fully self-contained with ALL context (intent, prompt, context, dependencies, reason). No need to find the preceding prompt commit to understand "why" - this simplifies `/pluto-spin` consolidation since each fiber is a complete unit.
 
 ## Session Commands Available
 
