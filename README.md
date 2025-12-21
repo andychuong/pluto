@@ -11,7 +11,7 @@ Pluto is a git workflow tool for AI coding agents. It tracks every file change a
 ## Installation
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/andychuong/pluto/main/install.sh | bash
+curl -fsSL plutoai.dev/install | bash
 ```
 
 Note: You can install from a different branch by replacing `main` with your desired branch name in the URL.
