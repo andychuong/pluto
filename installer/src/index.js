@@ -107,6 +107,65 @@ async function initializeAgents() {
   AVAILABLE_AGENTS = await discoverAvailableAgents();
 }
 
+// Compare semantic versions (returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal)
+function compareVersions(v1, v2) {
+  const parts1 = v1.split('.').map(Number);
+  const parts2 = v2.split('.').map(Number);
+  
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const part1 = parts1[i] || 0;
+    const part2 = parts2[i] || 0;
+    
+    if (part1 > part2) return 1;
+    if (part1 < part2) return -1;
+  }
+  return 0;
+}
+
+// Get current version from package.json
+async function getCurrentVersion() {
+  try {
+    const packagePath = path.join(__dirname, '..', 'package.json');
+    const packageContent = await fs.readFile(packagePath, 'utf-8');
+    const packageJson = JSON.parse(packageContent);
+    return packageJson.version;
+  } catch (error) {
+    return '1.0.0'; // Fallback version
+  }
+}
+
+// Check for updates with strict timeout
+async function checkForUpdates() {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+  
+  try {
+    const currentVersion = await getCurrentVersion();
+    const response = await fetch(
+      'https://raw.githubusercontent.com/andychuong/pluto/main/installer/package.json',
+      { signal: controller.signal }
+    );
+    
+    if (!response.ok) {
+      return null;
+    }
+    
+    const remotePackage = await response.json();
+    const latestVersion = remotePackage.version;
+    
+    if (compareVersions(latestVersion, currentVersion) > 0) {
+      return { current: currentVersion, latest: latestVersion };
+    }
+    
+    return null; // No update available
+  } catch (error) {
+    // Silently fail on network errors or timeout
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 // Only show banner for interactive commands
 const isQuietCommand = process.argv.includes('--quiet') || process.argv.includes('-q');
 if (!isQuietCommand) {
@@ -129,9 +188,23 @@ program
 program
   .command('init')
   .description('Initialize Pluto in your project')
-  .action(async () => {
+  .option('--skip-update-check', 'Skip checking for updates')
+  .action(async (options) => {
     // Initialize agents list
     await initializeAgents();
+    
+    // Check for updates unless skipped or PLUTO_SKIP_UPDATE_CHECK is set
+    if (!options.skipUpdateCheck && !process.env.PLUTO_SKIP_UPDATE_CHECK) {
+      const spinner = ora('Checking for updates...').start();
+      const updateInfo = await checkForUpdates();
+      
+      if (updateInfo) {
+        spinner.info(chalk.yellow(`Update available: ${updateInfo.current} → ${updateInfo.latest}`));
+        console.log(chalk.dim('  Run "pluto update" to upgrade\n'));
+      } else {
+        spinner.succeed('Pluto is up to date');
+      }
+    }
     
     console.log(chalk.yellow('\n📋 Let\'s set up Pluto for your project!\n'));
 
