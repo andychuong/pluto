@@ -29,15 +29,17 @@ Note: You can install from a different branch by replacing `main` with your desi
 pluto init
 ```
 
-### Update agents to latest versions
+### Update Pluto CLI
 
 ```bash
-# Update from default remote repository
+# Update Pluto CLI from default remote repository
 pluto update
 
 # Update from specific branch
 pluto update --branch main
 ```
+
+This updates the `pluto` command itself. To update agents in a project, run `pluto init` in that project directory.
 
 ### List available commands
 
@@ -101,7 +103,9 @@ To add new agent commands or prompts, place them in the `installer/commands` dir
 
 ## Team
 
-- Alex
-- Alexis
-- Andy
-- Justice
+<a href="https://github.com/alexander-t-ho"><img src="https://github.com/alexander-t-ho.png" width="60px" alt="Alexander Ho" /></a>
+<a href="https://github.com/amanyrath"><img src="https://github.com/amanyrath.png" width="60px" alt="Alexis Manyrath" /></a>
+<a href="https://github.com/andychuong"><img src="https://github.com/andychuong.png" width="60px" alt="Andy Chuong" /></a>
+<a href="https://github.com/Justiceleeg"><img src="https://github.com/Justiceleeg.png" width="60px" alt="Justice White" /></a>
+
+[**Alexander Ho**](https://github.com/alexander-t-ho) · [**Alexis Manyrath**](https://github.com/amanyrath) · [**Andy Chuong**](https://github.com/andychuong) · [**Justice White**](https://github.com/Justiceleeg)

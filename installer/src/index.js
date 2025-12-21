@@ -197,11 +197,15 @@ This file tracks all spin operations for audit purposes.
         logHeader
       );
 
+      // Track all installed files
+      const installedFiles = [];
+
       for (const toolValue of selectedTools) {
         const tool = AI_TOOLS.find(t => t.value === toolValue);
         spinner.text = `Setting up ${tool.name}...`;
 
-        await installForTool(cwd, tool, selectedAgents, commandsDir);
+        const files = await installForTool(cwd, tool, selectedAgents, commandsDir);
+        installedFiles.push(...files);
         await updateSettingsForTool(cwd, tool, addToAllowList);
       }
 
@@ -211,11 +215,17 @@ This file tracks all spin operations for audit purposes.
       await addToGitignore(cwd, '.claude');
       await addToGitignore(cwd, '.pluto');
 
-      // Save config
+      // Save config with installed files list
       await fs.mkdir(path.join(cwd, '.pluto'), { recursive: true });
       await fs.writeFile(
         path.join(cwd, '.pluto', 'config.json'),
-        JSON.stringify({ tools: selectedTools, agents: selectedAgents, addToAllowList, version: '1.0.0' }, null, 2)
+        JSON.stringify({
+          tools: selectedTools,
+          agents: selectedAgents,
+          addToAllowList,
+          installedFiles,
+          version: '1.0.0'
+        }, null, 2)
       );
 
       spinner.succeed(chalk.green('Installation complete!'));
@@ -270,46 +280,24 @@ program
 // Update command
 program
   .command('update')
-  .description('Update Pluto CLI and agents from remote repository')
+  .description('Update Pluto CLI from remote repository')
   .option('-b, --branch <branch>', 'Git branch to pull from (default: main)', 'main')
   .action(async (options) => {
-    const cwd = process.cwd();
-    const configPath = path.join(cwd, '.pluto', 'config.json');
-
-    // Check if pluto is initialized
-    try {
-      await fs.access(configPath);
-    } catch {
-      console.error(chalk.red('\n❌ Pluto not initialized in this directory.'));
-      console.log(chalk.yellow('Run "pluto init" first.\n'));
-      return;
-    }
-
-    // Read config to get currently installed tools and agents
-    let config;
-    try {
-      const configContent = await fs.readFile(configPath, 'utf-8');
-      config = JSON.parse(configContent);
-    } catch (error) {
-      console.error(chalk.red('\n❌ Failed to read configuration.'));
-      console.error(chalk.red(error.message + '\n'));
-      return;
-    }
-
-    const spinner = ora('Updating agents...').start();
+    const spinner = ora('Updating Pluto CLI...').start();
 
     try {
       // Pull from remote
       const repo = 'https://github.com/andychuong/pluto';
       spinner.text = `Pulling from ${repo} (${options.branch})...`;
-      
-      const tempDir = path.join(cwd, '.pluto', 'temp-update');
-      
+
+      const homeDir = process.env.HOME || process.env.USERPROFILE;
+      const tempDir = path.join(homeDir, '.pluto-temp-update');
+
       // Remove temp dir if it exists
       try {
         await fs.rm(tempDir, { recursive: true, force: true });
       } catch {}
-      
+
       await fs.mkdir(tempDir, { recursive: true });
 
       // Clone the repository
@@ -333,7 +321,6 @@ program
 
       // Reinstall Pluto CLI
       spinner.text = 'Reinstalling Pluto CLI...';
-      const homeDir = process.env.HOME || process.env.USERPROFILE;
       const plutoInstallDir = path.join(homeDir, '.pluto');
       const installerDir = path.join(tempDir, 'installer');
 
@@ -365,39 +352,16 @@ program
         return;
       }
 
-      // Update agents
-      spinner.text = 'Installing updated agents...';
-
-      const commandsDir = path.join(tempDir, 'installer', 'commands');
-
-      for (const toolValue of config.tools) {
-        const tool = AI_TOOLS.find(t => t.value === toolValue);
-        if (!tool) continue;
-
-        await installForTool(cwd, tool, config.agents, commandsDir);
-        await updateSettingsForTool(cwd, tool, config.addToAllowList);
-      }
-
       // Clean up temp directory
       try {
         await fs.rm(tempDir, { recursive: true, force: true });
       } catch {}
 
-      spinner.succeed(chalk.green('Pluto updated successfully!'));
+      spinner.succeed(chalk.green('Pluto CLI updated successfully!'));
 
       console.log(chalk.cyan('\n═══════════════════════════════════════════'));
-      console.log(chalk.bold('\n📦 Updated:\n'));
-
-      console.log(chalk.white('  Pluto CLI'));
-
-      for (const toolValue of config.tools) {
-        const tool = AI_TOOLS.find(t => t.value === toolValue);
-        console.log(chalk.white(`  ${tool.name} agents:`));
-        for (const agentValue of config.agents) {
-          console.log(chalk.dim(`    • ${agentValue}`));
-        }
-      }
-
+      console.log(chalk.bold('\n✅ Pluto CLI updated to latest version\n'));
+      console.log(chalk.dim('To update agents in a project, run "pluto init" in that directory.'));
       console.log(chalk.cyan('\n═══════════════════════════════════════════\n'));
 
     } catch (error) {
@@ -552,14 +516,64 @@ async function cleanupPreviousInstall(cwd) {
     // Directory doesn't exist, that's fine
   }
 
-  // Remove Pluto commands from .claude/commands (only files that look like pluto commands)
+  // Read config to get list of previously installed files (if any)
+  const configPath = path.join(cwd, '.pluto', 'config.json');
+  let installedFiles = [];
+  try {
+    const configContent = await fs.readFile(configPath, 'utf-8');
+    const config = JSON.parse(configContent);
+    installedFiles = config.installedFiles || [];
+  } catch {
+    // No config or can't read, use fallback patterns
+    installedFiles = [];
+  }
+
+  // Remove Pluto-installed commands from .claude/commands
   const claudeCommandsDir = path.join(cwd, '.claude', 'commands');
   try {
-    const files = await fs.readdir(claudeCommandsDir);
-    for (const file of files) {
-      // Only remove files that are pluto-related or were installed by pluto
-      if (file.startsWith('pluto-') || file.includes('-alexis') || file.includes('-justice')) {
-        await fs.unlink(path.join(claudeCommandsDir, file));
+    if (installedFiles.length > 0) {
+      // Remove files from the tracked list
+      for (const file of installedFiles) {
+        if (file.startsWith('.claude/commands/')) {
+          const filePath = path.join(cwd, file);
+          try {
+            await fs.unlink(filePath);
+          } catch {}
+        }
+      }
+    } else {
+      // Fallback: remove files matching pluto patterns
+      const files = await fs.readdir(claudeCommandsDir);
+      for (const file of files) {
+        if (file.startsWith('pluto-') && file.endsWith('.md')) {
+          await fs.unlink(path.join(claudeCommandsDir, file));
+        }
+      }
+    }
+  } catch {
+    // Directory doesn't exist, that's fine
+  }
+
+  // Remove Pluto-installed agents from .claude/agents
+  const claudeAgentsDir = path.join(cwd, '.claude', 'agents');
+  try {
+    if (installedFiles.length > 0) {
+      // Remove files from the tracked list
+      for (const file of installedFiles) {
+        if (file.startsWith('.claude/agents/')) {
+          const filePath = path.join(cwd, file);
+          try {
+            await fs.unlink(filePath);
+          } catch {}
+        }
+      }
+    } else {
+      // Fallback: remove all markdown files (since we don't know which ones were installed by pluto)
+      const files = await fs.readdir(claudeAgentsDir);
+      for (const file of files) {
+        if (file.endsWith('.md')) {
+          await fs.unlink(path.join(claudeAgentsDir, file));
+        }
       }
     }
   } catch {
@@ -692,6 +706,7 @@ async function addToGitignore(cwd, entry) {
 // Installation functions
 async function installForTool(cwd, tool, agents, commandsDir) {
   const toolCommandsDir = path.join(commandsDir, tool.value);
+  const installedFiles = [];
 
   switch (tool.value) {
     case 'claude-code': {
@@ -718,6 +733,8 @@ async function installForTool(cwd, tool, agents, commandsDir) {
         const dest = path.join(commandsDestDir, destFilename);
         try {
           await fs.copyFile(sourcePath, dest);
+          // Track installed file with relative path
+          installedFiles.push(`.claude/commands/${destFilename}`);
         } catch (error) {
           // Skip if file can't be copied
         }
@@ -742,6 +759,8 @@ async function installForTool(cwd, tool, agents, commandsDir) {
         const dest = path.join(agentsDestDir, destFilename);
         try {
           await fs.copyFile(sourcePath, dest);
+          // Track installed file with relative path
+          installedFiles.push(`.claude/agents/${destFilename}`);
         } catch (error) {
           // Skip if file can't be copied
         }
@@ -859,4 +878,6 @@ async function installForTool(cwd, tool, agents, commandsDir) {
       break;
     }
   }
+
+  return installedFiles;
 }
