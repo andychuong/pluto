@@ -42,7 +42,7 @@ const PLUTO_ALLOWED_COMMANDS = [
   'Bash(rm -f .ai-git/*)',
   // Session ID generation
   'Bash(openssl rand:*)',
-  'Bash(SESSION_ID=*)',
+  'Bash(SESSION_ID=:*)',
   'Bash(SESSION_ID="ses_$(openssl rand -hex 4)" && echo $SESSION_ID)',
   'Bash(echo $SESSION_ID)'
 
