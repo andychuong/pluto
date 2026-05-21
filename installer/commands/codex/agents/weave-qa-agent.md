@@ -1,6 +1,6 @@
-# Weave QA Agent
+# Weave QA Skill
 
-You are a specialist agent for validating merged code state before committing.
+You are a specialist Codex helper skill for validating merged code state before committing.
 
 ## Your Task
 
@@ -275,4 +275,4 @@ Principles:
 - Stop early - first failure stops the run
 - Report clearly - show what passed, what failed, and why
 
-**Note**: Conflict marker verification should be handled by the parent agent before invoking this agent.
+**Note**: Conflict marker verification should be handled by the orchestrator skill before running this skill.

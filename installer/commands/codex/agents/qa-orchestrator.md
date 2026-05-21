@@ -131,14 +131,14 @@ For each group, in order:
 ```
 → checkout the combined state of the first thread in group
 → run install command
-→ spawn parallel inline agents (one per thread)
+→ run thread checks in parallel (one check worker per thread)
 → wait for all results
 → proceed to next group
 ```
 
-### Sub-Agent Instructions
+### Parallel Check Instructions
 
-Pass the exact commands from Steps 1-2 to each sub-agent:
+Use the exact commands from Steps 1-2 for each parallel thread check:
 
 ```
 Checkout <thread-sha>.
@@ -148,7 +148,7 @@ Run these checks in order, stop on first failure:
 Return: PASS or FAIL: <which check failed> - "<error message>"
 ```
 
-Sub-agents do not reason about the stack. They execute the provided commands and report.
+Each parallel check is execution-only: run commands and report PASS/FAIL.
 
 ### Check Order
 
@@ -169,17 +169,17 @@ Orchestrator:
 
   → checkout Thread A's combined state
   → install dependencies
-  → Spawn parallel:
-      Agent → "Checkout A, lint → build, return PASS/FAIL"
-      Agent → "Checkout B, lint → build, return PASS/FAIL"
+  → Run in parallel:
+      Check worker → "Checkout A, lint → build, return PASS/FAIL"
+      Check worker → "Checkout B, lint → build, return PASS/FAIL"
   → Wait for results
 
   → checkout Thread C's combined state
   → install dependencies
-  → Spawn parallel:
-      Agent → "Checkout C, lint → build, return PASS/FAIL"
-      Agent → "Checkout D, lint → build, return PASS/FAIL"
-      Agent → "Checkout E, lint → build, return PASS/FAIL"
+  → Run in parallel:
+      Check worker → "Checkout C, lint → build, return PASS/FAIL"
+      Check worker → "Checkout D, lint → build, return PASS/FAIL"
+      Check worker → "Checkout E, lint → build, return PASS/FAIL"
   → Wait for results
 ```
 
@@ -187,7 +187,7 @@ Orchestrator:
 
 ## Step 5: Report Results
 
-Collect all sub-agent results and return them.
+Collect all parallel check results and return them.
 
 ```
 Results:
@@ -212,7 +212,7 @@ If the project has no lint or build scripts:
 
 ### No Dependency Changes
 
-All threads in one group. One install, then all sub-agents in parallel.
+All threads in one group. One install, then all thread checks in parallel.
 
 ### Every Thread Changes Dependencies
 
@@ -220,7 +220,7 @@ Each thread is its own group. Effectively sequential execution.
 
 ### Single Thread
 
-One group, one sub-agent.
+One group, one thread check.
 
 ---
 
@@ -246,5 +246,5 @@ Results:
 | 1. Discover | Identify tech stack, find validation commands (README, scripts, CI) |
 | 2. Define | Establish success criteria: install + lint + build |
 | 3. Group | Split threads at dependency update/remove points |
-| 4. Execute | For each group: install → parallel sub-agents (lint → build) |
+| 4. Execute | For each group: install → parallel thread checks (lint → build) |
 | 5. Report | Return pass/fail per thread with failure details |

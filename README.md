@@ -16,6 +16,24 @@ curl -fsSL plutoai.dev/install | bash
 
 Note: You can install from a different branch by replacing `main` with your desired branch name in the URL.
 
+### Windows
+
+Run the PowerShell installer from a cloned checkout:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+The installer copies Pluto into `%USERPROFILE%\.pluto`, runs `npm link`, and exposes the `pluto` command through your npm global bin directory.
+
+If `pluto` is not available in a new terminal after install, add the directory returned by `npm config get prefix` to your user `PATH`.
+
+To uninstall on Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
+```
+
 ### Requirements
 
 - Node.js 18+
@@ -99,7 +117,11 @@ Restore repository state after a failed operation.
 
 ### Adding New Agent Commands
 
-To add new agent commands or prompts, place them in the `installer/commands` directory under your chosen agent (e.g., claude-code). These files will be automatically included during installation.
+Pluto now maintains parallel workflow definitions:
+- `installer/commands/claude-code` for Claude command docs
+- `installer/commands/codex` for Codex-native skill docs
+
+During `pluto init`, Pluto installs Codex skills from `installer/commands/codex` (falling back to `installer/commands/claude-code` only if `codex` files are missing), writing them to `.codex/skills` and updating `AGENTS.md`.
 
 ## Team
 

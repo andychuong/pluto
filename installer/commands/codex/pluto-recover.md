@@ -1,17 +1,17 @@
-# /pluto-recover - Recovery from Failed Operations
+# pluto-recover - Recovery from Failed Operations
 
 Restore repository state after a failed spin or weave attempt.
 
 ## Usage
 ```
-/pluto-recover [--list] [--to <sha|label>]
+pluto-recover [--list] [--to <sha|label>]
 ```
 
 ## Behavior
 
 ### List Recovery Points
 ```
-/pluto-recover --list
+pluto-recover --list
 ```
 
 Output:
@@ -22,12 +22,12 @@ Output:
 2. `def5678` - pre-weave (1 hour ago)
 3. `ghi9012` - pre-spin (yesterday)
 
-Use `/pluto-recover --to abc1234` to restore.
+Use `pluto-recover --to abc1234` to restore.
 ```
 
 ### Recover to Point
 ```
-/pluto-recover --to abc1234
+pluto-recover --to abc1234
 ```
 
 Executes:
@@ -51,4 +51,4 @@ rm -f .ai-git/state.json
 
 - Confirm current state: `git log --oneline -5`
 - Fibers should be restored
-- Offer to retry `/pluto-spin` with different strategy
+- Offer to retry pluto-spin with different strategy

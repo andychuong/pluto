@@ -61,10 +61,10 @@ const AI_TOOLS = [
 // Dynamically discover available agents from the commands directory
 async function discoverAvailableAgents() {
   const commandsDir = path.join(__dirname, '..', 'commands');
-  const claudeCodeDir = path.join(commandsDir, 'claude-code');
+  const sourceDir = await resolveAgentDiscoveryDir(commandsDir);
   
   try {
-    const allFiles = await findMarkdownFilesRecursive(claudeCodeDir, claudeCodeDir, ['.md']);
+    const allFiles = await findMarkdownFilesRecursive(sourceDir, sourceDir, ['.md']);
     
     // Use the same deduplication logic as generateDestinationFilename
     const fileMap = generateDestinationFilename(allFiles, '.md');
@@ -120,6 +120,43 @@ function compareVersions(v1, v2) {
     if (part1 < part2) return -1;
   }
   return 0;
+}
+
+function getHomeDir() {
+  return process.env.HOME || process.env.USERPROFILE;
+}
+
+async function getGlobalBinDir() {
+  try {
+    const { execSync } = await import('child_process');
+    const npmPrefix = execSync('npm config get prefix', {
+      stdio: ['ignore', 'pipe', 'pipe']
+    }).toString().trim();
+
+    if (!npmPrefix) {
+      return null;
+    }
+
+    return process.platform === 'win32'
+      ? npmPrefix
+      : path.join(npmPrefix, 'bin');
+  } catch {
+    return null;
+  }
+}
+
+async function removeGlobalPlutoPackage() {
+  try {
+    const { execSync } = await import('child_process');
+    execSync('npm unlink -g pluto', { stdio: 'pipe' });
+  } catch {
+  }
+
+  try {
+    const { execSync } = await import('child_process');
+    execSync('npm uninstall -g pluto', { stdio: 'pipe' });
+  } catch {
+  }
 }
 
 // Get current version from package.json
@@ -208,27 +245,31 @@ program
     
     console.log(chalk.yellow('\n📋 Let\'s set up Pluto for your project!\n'));
 
-    // Claude Code is the only supported tool
-    const selectedTools = ['claude-code'];
+    // Install the primary integrations by default.
+    const selectedTools = ['claude-code', 'copilot', 'codex'];
 
     // Install all available agents/commands
     const selectedAgents = AVAILABLE_AGENTS.map(a => a.value);
 
-    // Step 1: Ask about allow list
-    console.log(chalk.cyan('\nCommands that will be added to the allow list:'));
-    PLUTO_ALLOWED_COMMANDS.forEach(cmd => console.log(chalk.dim(`  - ${cmd}`)));
-    console.log('');
+    // Allow list prompt is Claude-specific
+    let addToAllowList = false;
+    if (selectedTools.includes('claude-code')) {
+      console.log(chalk.cyan('\nCommands that will be added to the allow list:'));
+      PLUTO_ALLOWED_COMMANDS.forEach(cmd => console.log(chalk.dim(`  - ${cmd}`)));
+      console.log('');
 
-    const { addToAllowList } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'addToAllowList',
-        message: `Add these ${PLUTO_ALLOWED_COMMANDS.length} commands to Claude's allow list?`,
-        default: true
+      const promptResult = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'addToAllowList',
+          message: `Add these ${PLUTO_ALLOWED_COMMANDS.length} commands to Claude's allow list?`,
+          default: true
+        }
+      ]);
+      addToAllowList = promptResult.addToAllowList;
+      if (addToAllowList) {
+        console.log(chalk.green(`\n✓ Will add ${PLUTO_ALLOWED_COMMANDS.length} commands to allow list\n`));
       }
-    ]);
-    if (addToAllowList) {
-      console.log(chalk.green(`\n✓ Will add ${PLUTO_ALLOWED_COMMANDS.length} commands to allow list\n`));
     }
 
     // Step 2: Install
@@ -282,10 +323,11 @@ This file tracks all spin operations for audit purposes.
         await updateSettingsForTool(cwd, tool, addToAllowList);
       }
 
-      // Add .ai-git, .claude, and .pluto to .gitignore after folders are created
+      // Add generated Pluto directories to .gitignore after folders are created
       spinner.text = 'Updating .gitignore...';
       await addToGitignore(cwd, '.ai-git');
       await addToGitignore(cwd, '.claude');
+      await addToGitignore(cwd, '.codex');
       await addToGitignore(cwd, '.pluto');
 
       // Save config with installed files list
@@ -320,6 +362,9 @@ This file tracks all spin operations for audit purposes.
 
       if (selectedTools.includes('claude-code')) {
         console.log(chalk.green('\n✨ Commands installed! Use /command-name in Claude Code.\n'));
+      }
+      if (selectedTools.includes('codex')) {
+        console.log(chalk.green('\n✨ Codex Skills installed! Pluto workflows are available via AGENTS.md.\n'));
       }
 
     } catch (error) {
@@ -363,7 +408,7 @@ program
       const repo = 'https://github.com/andychuong/pluto';
       spinner.text = `Pulling from ${repo} (${options.branch})...`;
 
-      const homeDir = process.env.HOME || process.env.USERPROFILE;
+      const homeDir = getHomeDir();
       const tempDir = path.join(homeDir, '.pluto-temp-update');
 
       // Remove temp dir if it exists
@@ -465,12 +510,31 @@ program
     const spinner = ora('Uninstalling Pluto...').start();
 
     try {
-      const homeDir = process.env.HOME || process.env.USERPROFILE;
+      const homeDir = getHomeDir();
       const installDir = path.join(homeDir, '.pluto');
-      const binLocations = [
+      const globalBinDir = await getGlobalBinDir();
+      const binLocations = new Set([
         path.join('/usr/local/bin', 'pluto'),
         path.join(homeDir, '.local', 'bin', 'pluto')
-      ];
+      ]);
+
+      if (process.platform === 'win32') {
+        binLocations.add(path.join(homeDir, '.local', 'bin', 'pluto.cmd'));
+        binLocations.add(path.join(homeDir, '.local', 'bin', 'pluto.ps1'));
+      }
+
+      if (globalBinDir) {
+        if (process.platform === 'win32') {
+          binLocations.add(path.join(globalBinDir, 'pluto'));
+          binLocations.add(path.join(globalBinDir, 'pluto.cmd'));
+          binLocations.add(path.join(globalBinDir, 'pluto.ps1'));
+        } else {
+          binLocations.add(path.join(globalBinDir, 'pluto'));
+        }
+      }
+
+      spinner.text = 'Removing global Pluto package...';
+      await removeGlobalPlutoPackage();
 
       // Remove symlinks
       for (const binPath of binLocations) {
@@ -581,14 +645,6 @@ function generateDestinationFilename(files, extension) {
 
 // Clean up previous Pluto installation
 async function cleanupPreviousInstall(cwd) {
-  // Remove .pluto directory (hooks, config)
-  const plutoDir = path.join(cwd, '.pluto');
-  try {
-    await fs.rm(plutoDir, { recursive: true, force: true });
-  } catch {
-    // Directory doesn't exist, that's fine
-  }
-
   // Read config to get list of previously installed files (if any)
   const configPath = path.join(cwd, '.pluto', 'config.json');
   let installedFiles = [];
@@ -599,6 +655,14 @@ async function cleanupPreviousInstall(cwd) {
   } catch {
     // No config or can't read, use fallback patterns
     installedFiles = [];
+  }
+
+  // Remove .pluto directory (hooks, config)
+  const plutoDir = path.join(cwd, '.pluto');
+  try {
+    await fs.rm(plutoDir, { recursive: true, force: true });
+  } catch {
+    // Directory doesn't exist, that's fine
   }
 
   // Remove Pluto-installed commands from .claude/commands
@@ -625,6 +689,38 @@ async function cleanupPreviousInstall(cwd) {
     }
   } catch {
     // Directory doesn't exist, that's fine
+  }
+
+  // Remove Pluto-installed Codex skills and AGENTS file
+  try {
+    if (installedFiles.length > 0) {
+      for (const file of installedFiles) {
+        if (file.startsWith('.codex/skills/')) {
+          const filePath = path.join(cwd, file);
+          try {
+            await fs.unlink(filePath);
+          } catch {}
+        }
+        if (file === 'AGENTS.md') {
+          try {
+            await fs.unlink(path.join(cwd, file));
+          } catch {}
+        }
+      }
+    } else {
+      const skillsDir = path.join(cwd, '.codex', 'skills');
+      const skillEntries = await fs.readdir(skillsDir, { withFileTypes: true });
+      for (const entry of skillEntries) {
+        if (entry.isDirectory() && entry.name.startsWith('pluto-')) {
+          await fs.rm(path.join(skillsDir, entry.name), { recursive: true, force: true });
+        }
+      }
+      try {
+        await fs.unlink(path.join(cwd, 'AGENTS.md'));
+      } catch {}
+    }
+  } catch {
+    // Codex directories don't exist, that's fine
   }
 
   // Remove Pluto-installed agents from .claude/agents
@@ -904,7 +1000,8 @@ async function installForTool(cwd, tool, agents, commandsDir) {
       const destDir = path.join(cwd, '.github');
       await fs.mkdir(destDir, { recursive: true });
 
-      const allFiles = await findMarkdownFilesRecursive(toolCommandsDir, toolCommandsDir, ['.md']);
+      const copilotSourceDir = await resolveCopilotSourceDir(commandsDir);
+      const allFiles = await findMarkdownFilesRecursive(copilotSourceDir, copilotSourceDir, ['.md']);
       const fileMap = generateDestinationFilename(allFiles, '.md');
       
       const filesToInstall = agents && agents.length > 0 
@@ -928,7 +1025,9 @@ async function installForTool(cwd, tool, agents, commandsDir) {
     }
 
     case 'codex': {
-      const allFiles = await findMarkdownFilesRecursive(toolCommandsDir, toolCommandsDir, ['.md']);
+      // Reuse existing Pluto command docs for Codex Skills if no codex-specific directory exists yet.
+      const codexSourceDir = await resolveCodexSourceDir(commandsDir);
+      const allFiles = await findMarkdownFilesRecursive(codexSourceDir, codexSourceDir, ['.md']);
       const fileMap = generateDestinationFilename(allFiles, '.md');
       
       const filesToInstall = agents && agents.length > 0 
@@ -938,19 +1037,102 @@ async function installForTool(cwd, tool, agents, commandsDir) {
           })
         : fileMap;
 
-      let content = '# AI Agents\n\nGenerated by Pluto.\n\n';
-      for (const { sourcePath } of filesToInstall) {
+      const codexSkillsDir = path.join(cwd, '.codex', 'skills');
+      await fs.mkdir(codexSkillsDir, { recursive: true });
+
+      const installedSkills = [];
+
+      for (const { sourcePath, destFilename } of filesToInstall) {
         try {
-          const agentContent = await fs.readFile(sourcePath, 'utf-8');
-          content += agentContent + '\n\n';
+          const skillContent = await fs.readFile(sourcePath, 'utf-8');
+          const skillName = destFilename.replace('.md', '');
+          const skillDir = path.join(codexSkillsDir, skillName);
+          await fs.mkdir(skillDir, { recursive: true });
+
+          await fs.writeFile(path.join(skillDir, 'SKILL.md'), skillContent);
+          installedFiles.push(`.codex/skills/${skillName}/SKILL.md`);
+          installedSkills.push({
+            name: skillName,
+            description: extractSkillSummary(skillContent, skillName)
+          });
         } catch {
           // Skip if file can't be read
         }
       }
-      await fs.writeFile(path.join(cwd, 'AGENTS.md'), content);
+
+      const agentsContent = buildCodexAgentsFile(installedSkills);
+      await fs.writeFile(path.join(cwd, 'AGENTS.md'), agentsContent);
+      installedFiles.push('AGENTS.md');
       break;
     }
   }
 
   return installedFiles;
+}
+
+async function resolveCodexSourceDir(commandsDir) {
+  const codexDir = path.join(commandsDir, 'codex');
+  try {
+    await fs.access(codexDir);
+    return codexDir;
+  } catch {
+    return path.join(commandsDir, 'claude-code');
+  }
+}
+
+async function resolveCopilotSourceDir(commandsDir) {
+  const copilotDir = path.join(commandsDir, 'copilot');
+  try {
+    await fs.access(copilotDir);
+    return copilotDir;
+  } catch {
+    return resolveCodexSourceDir(commandsDir);
+  }
+}
+
+async function resolveAgentDiscoveryDir(commandsDir) {
+  const codexDir = path.join(commandsDir, 'codex');
+  try {
+    await fs.access(codexDir);
+    return codexDir;
+  } catch {
+    return path.join(commandsDir, 'claude-code');
+  }
+}
+
+function extractSkillSummary(markdown, fallback) {
+  const lines = markdown.split('\n').map(line => line.trim());
+  for (const line of lines) {
+    if (!line || line.startsWith('#') || line.startsWith('```')) continue;
+    return line.length > 120 ? `${line.slice(0, 117)}...` : line;
+  }
+  return `Pluto workflow skill for ${fallback}.`;
+}
+
+function buildCodexAgentsFile(skills) {
+  let content = '# AGENTS.md instructions for Pluto\n\n';
+  content += '## Turn Enforcement\n';
+  content += '- On every user turn, check whether Pluto session tracking is active before making edits.\n';
+  content += '- Session-active check: read `.ai-git/session.json`; if it exists and `active` is `true`, enforce prompt logging.\n';
+  content += '- If session is active, create a `type: prompt` empty commit BEFORE any code changes or file edits.\n';
+  content += '- Prompt commit must include: `session`, `timestamp`, `intent`, `context`, `dependencies`, verbatim `prompt`, and `type: prompt`.\n';
+  content += '- During active sessions, `type: work` commits must be minimal working pieces (single micro-intent); split unrelated edits into separate fibers.\n';
+  content += '- Do not skip prompt logging during an active session, even for small requests.\n\n';
+  content += '## Skills\n';
+  content += 'A skill is a set of local instructions stored in a `SKILL.md` file.\n';
+  content += '### Available skills\n';
+
+  if (skills.length === 0) {
+    content += '- No Pluto skills were installed.\n';
+  } else {
+    for (const skill of skills.sort((a, b) => a.name.localeCompare(b.name))) {
+      content += `- ${skill.name}: ${skill.description} (file: .codex/skills/${skill.name}/SKILL.md)\n`;
+    }
+  }
+
+  content += '\n### How to use skills\n';
+  content += '- If a user request clearly matches a Pluto workflow, use the corresponding skill.\n';
+  content += '- Read only the needed sections from `SKILL.md` and execute the workflow directly.\n';
+  content += '- If a skill is missing or unclear, continue with the best fallback and note the gap.\n';
+  return content;
 }

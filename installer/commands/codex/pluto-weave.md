@@ -1,18 +1,18 @@
-# /pluto-weave — Intelligent Merge with AI-Driven Decisions
+# pluto-weave — Intelligent Merge with AI-Driven Decisions
 
-Weave remote changes into local threads with Claude as the decision-maker.
+Weave remote changes into local threads with Codex as the decision-maker.
 
 ## Usage
 
 ```
-/pluto-weave [--target <branch>] [--no-qa]
+pluto-weave [--target <branch>] [--no-qa]
 ```
 
 **Default target:** `origin/main`
 
 ---
 
-## Architecture: Inline Agent + QA Agent
+## Architecture: Orchestrator Skill + Helper Skill
 
 **Why isolate the work?** Weaving involves heavy context:
 - Reading commit history from both branches
@@ -20,19 +20,19 @@ Weave remote changes into local threads with Claude as the decision-maker.
 - Understanding codebase patterns for consistency decisions
 - Documenting reasoning for each resolution
 
-### Agent Structure
+### Skill Structure
 
-- **Conflict resolution**: Runs as an **inline agent** (spawned within this command's execution, not a separate agent file). The decision framework below guides its behavior.
-- **QA validation**: Calls the **weave-qa-agent** (`installer/agents/weave-qa-agent.md`) - a defined agent that validates the merged state.
+- **Conflict resolution**: Handled by the active Codex orchestrator using the decision framework below.
+- **QA validation**: Use the `weave-qa-agent` helper skill to validate merged state.
 
 ### Workflow
 
-1. **Main conversation** invokes `/pluto-weave`
-2. **Inline agent executes** with focused context:
+1. **Main workflow** runs pluto-weave
+2. **Orchestrator executes** with focused context:
    - Target branch to merge
    - Decision framework (from this doc)
    - Current branch state
-3. **Inline agent works through:**
+3. **Orchestrator works through:**
    - Gathers context (Step 1)
    - Executes merge (Step 4)
    - Resolves conflicts using decision framework (Step 5)
@@ -50,7 +50,7 @@ Weave remote changes into local threads with Claude as the decision-maker.
 
 ### Escalation Handling
 
-The inline agent should:
+The orchestrator should:
 - Auto-resolve everything it confidently can
 - Collect all escalations (don't stop at first one)
 - Return escalations as a batch for user decisions
@@ -60,7 +60,7 @@ The inline agent should:
 
 ## Philosophy
 
-**You (Claude) are the decision-maker.** Take on the cognitive load of:
+**You (Codex) are the decision-maker.** Take on the cognitive load of:
 - Analyzing what remote changes accomplish
 - Understanding what local threads accomplish
 - Resolving conflicts by choosing the **best code for the codebase**
@@ -93,7 +93,7 @@ The goal is to produce the best quality code possible. You have the context from
 
 ## Terminology
 
-- **Threads**: Clean, meaningful commits from `/pluto-spin` (local work)
+- **Threads**: Clean, meaningful commits from pluto-spin (local work)
 - **Weave**: Merging remote changes with local threads
 - **Fabric**: The target branch where all work integrates
 
@@ -105,7 +105,7 @@ Before making ANY decisions, gather full context from both sides.
 
 ### 1a. Local Context (Your Threads)
 
-Threads from `/pluto-spin` contain rich metadata:
+Threads from pluto-spin contain rich metadata:
 - What functionality was added/changed
 - The intent behind each change (from fiber `prompt:` and `reason:`)
 - Conversation context explaining "why" decisions were made
@@ -165,7 +165,7 @@ done
 
 - **Uncommitted changes?** → Fail: "Cannot weave with uncommitted changes. Commit or stash first."
 - **Already up to date?** → Exit: "Already up to date with ${TARGET}. Nothing to weave."
-- **Unspun fibers?** → Fail: "Unspun fibers detected. Run `/pluto-spin` first to consolidate fibers into threads before weaving."
+- **Unspun fibers?** → Fail: "Unspun fibers detected. Run pluto-spin first to consolidate fibers into threads before weaving."
 
 ---
 
@@ -174,8 +174,12 @@ done
 Before any destructive operation:
 
 ```bash
+# Pre-compute date to avoid command substitution
+TIMESTAMP=$(date -Iseconds)
+REV=$(git rev-parse HEAD)
+
 mkdir -p .ai-git
-echo "$(git rev-parse HEAD) $(date -Iseconds) pre-weave" >> .ai-git/recovery
+echo "${REV} ${TIMESTAMP} pre-weave" >> .ai-git/recovery
 ```
 
 ---
@@ -313,10 +317,10 @@ git diff --check
 
 ## Step 6: Validate Merge
 
-After all conflicts resolved, invoke the **weave-qa-agent** to validate the merged state.
+After all conflicts are resolved, run the `weave-qa-agent` helper skill to validate the merged state.
 
 ```
-Invoke: /weave-qa-agent.md
+Use skill: `weave-qa-agent`
 
 Context to pass:
 - All changes are staged (merged state)
@@ -404,9 +408,12 @@ If user declines, preserve all artifacts for reference.
 If the weave fails at any step, log the failure:
 
 ```bash
+# Pre-compute date to avoid command substitution
+TIMESTAMP=$(date -Iseconds)
+
 mkdir -p .ai-git
 cat >> .ai-git/weave-failures.log << EOF
-## Failed Weave: $(date -Iseconds)
+## Failed Weave: ${TIMESTAMP}
 
 **Target:** ${TARGET}
 **Step Failed:** <step number and name>
@@ -419,7 +426,7 @@ EOF
 
 Then:
 - **Mid-merge failure:** `git merge --abort`
-- **Recovery:** `/pluto-recover` command uses `.ai-git/recovery`
+- **Recovery:** pluto-recover command uses `.ai-git/recovery`
 - **Never leave broken:** Always abort if can't complete cleanly
 - **Preserve artifacts:** Do not clean up `.ai-git/` on failure
 

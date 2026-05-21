@@ -67,7 +67,9 @@ We welcome feature suggestions! Please create an issue with:
 ### Adding New Agent Commands
 
 To add new agent commands or prompts:
-1. Place them in the `installer/commands` directory under your chosen agent (e.g., `claude-code`)
+1. Keep both variants aligned:
+   - `installer/commands/claude-code` for Claude
+   - `installer/commands/codex` for Codex-native skills
 2. Follow the existing file structure and naming conventions
 3. Test the command thoroughly before submitting
 
